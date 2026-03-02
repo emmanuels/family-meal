@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Recipe, WeekPlan } from '@/types/index'
+import type { DayIndex, Recipe, WeekPlan } from '@/types/index'
 
 // ─── ISO Week Helpers ─────────────────────────────────────────────────────────
 
@@ -25,16 +25,24 @@ function getCurrentWeekId(): string {
   const weekNum = Math.floor(daysSinceWeekOne / 7) + 1
 
   // Edge case: early January may compute week < 1 → last week of previous year
+  // Use Dec 28 (always in the last ISO week of any year) to find the correct week number
   if (weekNum < 1) {
-    return `${year - 1}-W52`
+    const dec28Prev = new Date(Date.UTC(year - 1, 11, 28))
+    const jan4Prev = new Date(Date.UTC(year - 1, 0, 4))
+    const dowPrev = jan4Prev.getUTCDay() === 0 ? 7 : jan4Prev.getUTCDay()
+    const weekOneMonPrev = new Date(jan4Prev)
+    weekOneMonPrev.setUTCDate(jan4Prev.getUTCDate() - (dowPrev - 1))
+    const lastWeek =
+      Math.floor((dec28Prev.getTime() - weekOneMonPrev.getTime()) / 86_400_000 / 7) + 1
+    return `${year - 1}-W${String(lastWeek).padStart(2, '0')}`
   }
 
   return `${year}-W${String(weekNum).padStart(2, '0')}`
 }
 
-function getCurrentDay(): number {
+function getCurrentDay(): DayIndex {
   const dow = new Date().getUTCDay() // 0=Sun, 1=Mon … 6=Sat
-  return dow === 0 ? 6 : dow - 1 // Convert to ISO: 0=Mon … 6=Sun
+  return (dow === 0 ? 6 : dow - 1) as DayIndex // Convert to ISO: 0=Mon … 6=Sun
 }
 
 // ─── AppState Interface ───────────────────────────────────────────────────────
@@ -63,10 +71,10 @@ interface AppState {
   setLoadingRecipes: (loading: boolean) => void
 
   // ── UI Slice ─────────────────────────────────────────────────────────────
-  selectedDay: number // 0–6 (0=Mon … 6=Sun); initialized to current weekday
+  selectedDay: DayIndex // 0–6 (0=Mon … 6=Sun); initialized to current weekday
   quickAddOpen: boolean
 
-  setSelectedDay: (day: number) => void
+  setSelectedDay: (day: DayIndex) => void
   toggleQuickAdd: () => void
 }
 
