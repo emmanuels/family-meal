@@ -29,8 +29,8 @@ export const MealCell = React.memo(function MealCell({
         !isEmpty && !isVegetarian && 'bg-cream border border-warm',
       )}
     >
-      {/* Slot type label */}
-      <p className="text-xs text-charcoal/50">{slotType}</p>
+      {/* Slot type label — shown on mobile only; desktop MealGrid provides row headers */}
+      {variant === 'mobile' && <p className="text-xs text-charcoal/50">{slotType}</p>}
 
       {isEmpty ? (
         /* Empty state: + icon centred */

@@ -63,7 +63,8 @@ const TODAY_WEEK_ID = (() => {
 
 export function WeekNav() {
   const currentWeek = useAppStore((s) => s.currentWeek)
-  const setCurrentWeek = useAppStore((s) => s.setCurrentWeek)
+  // Use getState() for stable action reference — actions never change, selector subscription is wasteful
+  const { setCurrentWeek } = useAppStore.getState()
 
   const isCurrentWeek = currentWeek === TODAY_WEEK_ID
 

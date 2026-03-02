@@ -4,18 +4,7 @@ import { useEffect, useState } from 'react'
 import { useAppStore } from '@/store/store'
 import { WeekNav } from '@/components/planning/WeekNav'
 import { MealGrid } from '@/components/planning/MealGrid'
-
-// ─── Local UI helpers ─────────────────────────────────────────────────────────
-
-function ErrorBanner() {
-  return (
-    <div className="mx-4 mt-4 border-l-4 border-terracotta bg-warm p-3">
-      <p className="text-sm text-charcoal">
-        Unable to load the meal plan. Check your connection and try again.
-      </p>
-    </div>
-  )
-}
+import { ErrorBanner } from '@/components/planning/ErrorBanner'
 
 function LoadingSkeleton() {
   return (
@@ -91,7 +80,7 @@ export function DesktopPlanningView() {
         ) : (
           <>
             <WeekNav />
-            <div className="flex-1 overflow-x-auto p-4">
+            <div className="flex-1 p-4">
               <MealGrid />
             </div>
           </>
