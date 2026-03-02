@@ -1,0 +1,82 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useAppStore } from '@/store/store'
+import { WeekNav } from '@/components/planning/WeekNav'
+import { DaySwipeView } from '@/components/planning/DaySwipeView'
+
+// ─── Local UI helpers ─────────────────────────────────────────────────────────
+
+function ErrorBanner() {
+  return (
+    <div className="mx-4 mt-4 border-l-4 border-terracotta bg-warm p-3">
+      <p className="text-sm text-charcoal">
+        Unable to load the meal plan. Check your connection and try again.
+      </p>
+    </div>
+  )
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-2 p-4">
+      {Array.from({ length: 5 }, (_, i) => (
+        <div key={i} className="h-[84px] animate-pulse rounded bg-warm" />
+      ))}
+    </div>
+  )
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export function MobilePlanningView() {
+  const [error, setError] = useState(false)
+
+  const currentWeek = useAppStore((s) => s.currentWeek)
+  const isLoadingPlan = useAppStore((s) => s.isLoadingPlan)
+
+  useEffect(() => {
+    let cancelled = false
+    const { setWeekPlan, setLoadingPlan, setRecipes, setLoadingRecipes } = useAppStore.getState()
+
+    const load = async () => {
+      setError(false)
+      setLoadingPlan(true)
+      setLoadingRecipes(true)
+      try {
+        const [planRes, recipesRes] = await Promise.all([
+          fetch(`/api/planning?week=${currentWeek}`),
+          fetch('/api/recipes'),
+        ])
+        if (!planRes.ok || !recipesRes.ok) throw new Error('Fetch failed')
+        const [weekPlan, recipes] = await Promise.all([planRes.json(), recipesRes.json()])
+        if (!cancelled) {
+          setWeekPlan(weekPlan)
+          setRecipes(recipes)
+        }
+      } catch {
+        if (!cancelled) setError(true)
+      } finally {
+        if (!cancelled) {
+          setLoadingPlan(false)
+          setLoadingRecipes(false)
+        }
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [currentWeek]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (error) return <ErrorBanner />
+  if (isLoadingPlan) return <LoadingSkeleton />
+
+  return (
+    <>
+      <WeekNav />
+      <DaySwipeView />
+    </>
+  )
+}
