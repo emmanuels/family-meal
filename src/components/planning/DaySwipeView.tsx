@@ -19,6 +19,9 @@ const MEAL_TYPE_ORDER: MealType[] = [
 
 const SWIPE_THRESHOLD = 40 // px
 
+// Day names for fallback label when weekPlan is not yet loaded
+const DAY_NAMES_FR = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getDayLabel(weekStart: string, dayIndex: number): string {
@@ -43,7 +46,8 @@ export function DaySwipeView() {
   const weekPlan = useAppStore((s) => s.weekPlan)
   const selectedDay = useAppStore((s) => s.selectedDay)
   const recipes = useAppStore((s) => s.recipes)
-  const setSelectedDay = useAppStore((s) => s.setSelectedDay)
+  // Use getState() for stable action reference — actions never change so selector subscription is wasteful
+  const { setSelectedDay } = useAppStore.getState()
 
   const touchStartX = useRef<number>(0)
   const today = getTodayIndex()
@@ -67,7 +71,10 @@ export function DaySwipeView() {
     }
   }
 
-  const dayLabel = weekPlan ? getDayLabel(weekPlan.weekStart, selectedDay) : ''
+  // Fallback to day-name-only when weekPlan is not yet loaded (avoids blank header)
+  const dayLabel = weekPlan
+    ? getDayLabel(weekPlan.weekStart, selectedDay)
+    : (DAY_NAMES_FR[selectedDay] ?? '')
 
   return (
     <div

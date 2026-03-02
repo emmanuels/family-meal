@@ -84,7 +84,7 @@ export const useAppStore = create<AppState>()((set) => ({
   // ── Week Plan Slice ────────────────────────────────────────────────────────
   weekPlan: null,
   currentWeek: getCurrentWeekId(),
-  isLoadingPlan: false,
+  isLoadingPlan: true, // true on init — MobilePlanningView shows skeleton immediately (no flash)
 
   setWeekPlan: (plan) => set({ weekPlan: plan }),
 

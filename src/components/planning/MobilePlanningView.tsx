@@ -70,13 +70,18 @@ export function MobilePlanningView() {
     }
   }, [currentWeek]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (error) return <ErrorBanner />
-  if (isLoadingPlan) return <LoadingSkeleton />
-
   return (
     <>
-      <WeekNav />
-      <DaySwipeView />
+      {/* AC6: non-blocking — banner renders ABOVE day view, never replaces it */}
+      {error && <ErrorBanner />}
+      {isLoadingPlan ? (
+        <LoadingSkeleton />
+      ) : (
+        <>
+          <WeekNav />
+          <DaySwipeView />
+        </>
+      )}
     </>
   )
 }

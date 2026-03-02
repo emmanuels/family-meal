@@ -45,7 +45,17 @@ const TODAY_WEEK_ID = (() => {
       86_400_000,
   )
   const weekNum = Math.floor(days / 7) + 1
-  if (weekNum < 1) return `${year - 1}-W52`
+  // Use Dec 28 (always in the last ISO week of any year) to handle W52 vs W53 correctly
+  if (weekNum < 1) {
+    const dec28Prev = new Date(Date.UTC(year - 1, 11, 28))
+    const jan4Prev = new Date(Date.UTC(year - 1, 0, 4))
+    const dowPrev = jan4Prev.getUTCDay() === 0 ? 7 : jan4Prev.getUTCDay()
+    const weekOneMonPrev = new Date(jan4Prev)
+    weekOneMonPrev.setUTCDate(jan4Prev.getUTCDate() - (dowPrev - 1))
+    const lastWeek =
+      Math.floor((dec28Prev.getTime() - weekOneMonPrev.getTime()) / 86_400_000 / 7) + 1
+    return `${year - 1}-W${String(lastWeek).padStart(2, '0')}`
+  }
   return `${year}-W${String(weekNum).padStart(2, '0')}`
 })()
 
