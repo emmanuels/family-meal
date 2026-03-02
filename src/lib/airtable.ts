@@ -67,6 +67,20 @@ const SLOT_TYPE_ORDER = [
   'Goûter',
 ] as const
 
+// ─── Day Parsing ──────────────────────────────────────────────────────────────
+
+/** Converts a French day name to DayIndex. Throws AirtableError on unrecognized names. */
+function parseDayIndex(dayName: string | undefined, recordId: string): number {
+  const index = DAY_NAME_TO_INDEX[dayName ?? '']
+  if (index === undefined) {
+    throw new AirtableError(
+      `Unrecognized day name in Planning record "${recordId}": "${dayName}"`,
+      502,
+    )
+  }
+  return index
+}
+
 // ─── Week Utilities ───────────────────────────────────────────────────────────
 
 /**
@@ -83,6 +97,13 @@ function weekIdToDateRange(weekId: string): { start: string; end: string } {
   }
   const year = parseInt(match[1], 10)
   const weekNum = parseInt(match[2], 10)
+
+  if (weekNum < 1 || weekNum > 53) {
+    throw new AirtableError(
+      `Invalid week number ${weekNum} in "${weekId}" — valid range is W01–W53`,
+      400,
+    )
+  }
 
   // Jan 4 is always in ISO week 1 (ISO 8601)
   const jan4 = new Date(Date.UTC(year, 0, 4))
@@ -104,9 +125,7 @@ function weekIdToDateRange(weekId: string): { start: string; end: string } {
   return { start: fmt(monday), end: fmt(sunday) }
 }
 
-// ─── Internal Fetch Helper ────────────────────────────────────────────────────
-
-const BASE_URL = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}`
+// ─── Internal Fetch Helpers ───────────────────────────────────────────────────
 
 interface AirtableListResponse {
   records: Array<{ id: string; fields: Record<string, unknown> }>
@@ -117,13 +136,21 @@ async function airtableFetch(
   table: string,
   params?: URLSearchParams,
 ): Promise<AirtableListResponse> {
+  // Validate env vars on every call — fail fast with a clear message
+  const apiKey = process.env.AIRTABLE_API_KEY
+  const baseId = process.env.AIRTABLE_BASE_ID
+
+  if (!apiKey) throw new AirtableError('AIRTABLE_API_KEY environment variable is not set', 500)
+  if (!baseId) throw new AirtableError('AIRTABLE_BASE_ID environment variable is not set', 500)
+
+  const baseUrl = `https://api.airtable.com/v0/${baseId}`
   const url = params
-    ? `${BASE_URL}/${encodeURIComponent(table)}?${params.toString()}`
-    : `${BASE_URL}/${encodeURIComponent(table)}`
+    ? `${baseUrl}/${encodeURIComponent(table)}?${params.toString()}`
+    : `${baseUrl}/${encodeURIComponent(table)}`
 
   const res = await fetch(url, {
     headers: {
-      Authorization: `Bearer ${process.env.AIRTABLE_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     cache: 'no-store',
@@ -139,6 +166,28 @@ async function airtableFetch(
   }
 
   return res.json() as Promise<AirtableListResponse>
+}
+
+/**
+ * Fetches ALL records from a table, consuming Airtable pagination automatically.
+ * Prevents silent data truncation at the default 100-record page limit.
+ */
+async function airtableFetchAll(
+  table: string,
+  baseParams?: URLSearchParams,
+): Promise<Array<{ id: string; fields: Record<string, unknown> }>> {
+  const allRecords: Array<{ id: string; fields: Record<string, unknown> }> = []
+  let offset: string | undefined
+
+  do {
+    const params = new URLSearchParams(baseParams)
+    if (offset) params.set('offset', offset)
+    const page = await airtableFetch(table, params)
+    allRecords.push(...page.records)
+    offset = page.offset
+  } while (offset)
+
+  return allRecords
 }
 
 // ─── Record Mappers ───────────────────────────────────────────────────────────
@@ -164,7 +213,7 @@ function mapMealSlot(id: string, fields: RawFields): MealSlot {
   return MealSlotSchema.parse({
     id,
     date: fields[FIELDS.planning.date] ?? '',
-    day: DAY_NAME_TO_INDEX[dayName ?? ''] ?? 0,
+    day: parseDayIndex(dayName, id),
     slotType: fields[FIELDS.planning.slotType] ?? '',
     recipeId: recipeIds?.[0] ?? null,
     recipeName: (fields[FIELDS.planning.recipeName] as string | undefined) ?? null,
@@ -187,9 +236,9 @@ function mapIngredient(id: string, fields: RawFields): Ingredient {
 
 // ─── Public Service Functions ─────────────────────────────────────────────────
 
-/** Fetch the complete recipe library. */
+/** Fetch the complete recipe library (all pages). */
 export async function getRecipes(): Promise<Recipe[]> {
-  const { records } = await airtableFetch('Recettes')
+  const records = await airtableFetchAll('Recettes')
   return records.map(({ id, fields }) => mapRecipe(id, fields))
 }
 
@@ -200,12 +249,12 @@ export async function getRecipes(): Promise<Recipe[]> {
 export async function getWeekPlan(weekId: string): Promise<WeekPlan> {
   const { start, end } = weekIdToDateRange(weekId)
 
-  // Use IS_BEFORE/IS_AFTER to safely filter Date fields
+  // Field names referenced via FIELDS const — never hardcoded in formula strings
   const params = new URLSearchParams({
-    filterByFormula: `AND(NOT(IS_BEFORE({Semaine}, '${start}')), NOT(IS_AFTER({Semaine}, '${end}')))`,
+    filterByFormula: `AND(NOT(IS_BEFORE({${FIELDS.planning.date}}, '${start}')), NOT(IS_AFTER({${FIELDS.planning.date}}, '${end}')))`,
   })
 
-  const { records } = await airtableFetch('Planning', params)
+  const records = await airtableFetchAll('Planning', params)
 
   const slots = records
     .map(({ id, fields }) => mapMealSlot(id, fields))
@@ -225,9 +274,10 @@ export async function getWeekPlan(weekId: string): Promise<WeekPlan> {
  * @param recipeId  Airtable record ID (e.g. "rec3UYmUC66UCFfoF")
  */
 export async function getIngredients(recipeId: string): Promise<Ingredient[]> {
+  // Field name referenced via FIELDS const — not hardcoded in the formula string
   const params = new URLSearchParams({
-    filterByFormula: `FIND("${recipeId}", ARRAYJOIN({ID Recette}, ","))`,
+    filterByFormula: `FIND("${recipeId}", ARRAYJOIN({${FIELDS.ingredient.recipeIds}}, ","))`,
   })
-  const { records } = await airtableFetch('Ingrédients', params)
+  const records = await airtableFetchAll('Ingrédients', params)
   return records.map(({ id, fields }) => mapIngredient(id, fields))
 }
