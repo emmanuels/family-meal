@@ -25,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="fr">
       <body
         className={`${playfairDisplay.variable} ${dmSans.variable} font-sans antialiased`}
       >
