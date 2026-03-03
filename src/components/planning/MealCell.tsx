@@ -29,11 +29,12 @@ export const MealCell = React.memo(function MealCell({
         'flex flex-col justify-between rounded px-3 py-2',
         variant === 'mobile' ? 'h-[84px]' : 'h-[76px]',
         isEmpty && 'border border-dashed border-warm',
+        isEmpty && onTap && 'cursor-pointer active:opacity-70',
         !isEmpty && isVegetarian && 'bg-sage-light',
         !isEmpty && !isVegetarian && 'bg-cream border border-warm',
         !isEmpty && onTap && 'cursor-pointer active:opacity-80',
       )}
-      onClick={!isEmpty && onTap ? onTap : undefined}
+      onClick={onTap}
     >
       {/* Slot type label — shown on mobile only; desktop MealGrid provides row headers */}
       {variant === 'mobile' && <p className="text-xs text-charcoal/50">{slotType}</p>}
@@ -45,8 +46,8 @@ export const MealCell = React.memo(function MealCell({
         </div>
       ) : (
         <>
-          {/* Recipe name */}
-          <p className="truncate text-sm font-medium text-charcoal">{slot.recipeName}</p>
+          {/* Recipe name — 2-line clamp for readability */}
+          <p className="line-clamp-2 text-xs font-medium leading-tight text-charcoal">{slot.recipeName}</p>
           {/* Omnivore annotation badge (FR8) — shows omni variant text when present.
               slot is narrowed to non-null here (isEmpty === false). Empty string ""
               is intentionally treated as falsy — no badge shown for blank annotations. */}

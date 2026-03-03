@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { useAppStore } from '@/store/store'
 import { MealCell } from '@/components/planning/MealCell'
-import type { DayIndex, MealType } from '@/types/index'
+import { SlotSwapSheet } from '@/components/planning/SlotSwapSheet'
+import type { DayIndex, MealSlot, MealType } from '@/types/index'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -37,6 +39,14 @@ function getDayHeader(weekStart: string, dayIndex: number): string {
 export function MealGrid() {
   const weekPlan = useAppStore((s) => s.weekPlan)
   const recipes = useAppStore((s) => s.recipes)
+
+  const [tappedSlot, setTappedSlot] = useState<MealSlot | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
+
+  function handleSheetOpenChange(open: boolean) {
+    setSheetOpen(open)
+    if (!open) setTimeout(() => setTappedSlot(null), 350)
+  }
 
   return (
     <div className="overflow-x-auto">
@@ -75,12 +85,17 @@ export function MealGrid() {
                   slotType={mealType}
                   isVegetarian={recipe?.isVegetarian ?? false}
                   variant="desktop"
+                  onTap={slot ? () => { setTappedSlot(slot); setSheetOpen(true) } : undefined}
                 />
               )
             })}
           </div>
         ))}
       </div>
+
+      {tappedSlot && (
+        <SlotSwapSheet slot={tappedSlot} open={sheetOpen} onOpenChange={handleSheetOpenChange} />
+      )}
     </div>
   )
 }

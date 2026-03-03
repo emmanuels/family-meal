@@ -151,7 +151,7 @@ export function DaySwipeView() {
               slotType={mealType}
               isVegetarian={isVegetarian}
               variant="mobile"
-              onTap={slot?.recipeId ? () => { setTappedSlot(slot); setSheetOpen(true) } : undefined}
+              onTap={slot ? () => { setTappedSlot(slot); setSheetOpen(true) } : undefined}
             />
           )
         })}
