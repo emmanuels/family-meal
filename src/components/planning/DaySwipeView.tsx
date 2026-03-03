@@ -1,10 +1,11 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useAppStore } from '@/store/store'
 import { MealCell } from '@/components/planning/MealCell'
+import { SlotSwapSheet } from '@/components/planning/SlotSwapSheet'
 import { cn } from '@/lib/utils'
-import type { DayIndex, MealType } from '@/types/index'
+import type { DayIndex, MealSlot, MealType } from '@/types/index'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,15 @@ export function DaySwipeView() {
 
   const touchStartX = useRef<number>(0)
   const today = getTodayIndex()
+
+  // Slot swap sheet state
+  const [tappedSlot, setTappedSlot] = useState<MealSlot | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
+
+  function handleSheetOpenChange(open: boolean) {
+    setSheetOpen(open)
+    if (!open) setTimeout(() => setTappedSlot(null), 350)
+  }
 
   // Build slot list for selected day in display order
   const daySlots = MEAL_TYPE_ORDER.map((mealType) => ({
@@ -141,10 +151,20 @@ export function DaySwipeView() {
               slotType={mealType}
               isVegetarian={isVegetarian}
               variant="mobile"
+              onTap={slot?.recipeId ? () => { setTappedSlot(slot); setSheetOpen(true) } : undefined}
             />
           )
         })}
       </div>
+
+      {/* Bottom sheet for slot swap — only mounted when a slot has been tapped */}
+      {tappedSlot && (
+        <SlotSwapSheet
+          slot={tappedSlot}
+          open={sheetOpen}
+          onOpenChange={handleSheetOpenChange}
+        />
+      )}
     </div>
   )
 }

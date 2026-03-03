@@ -234,6 +234,44 @@ function mapIngredient(id: string, fields: RawFields): Ingredient {
   })
 }
 
+// ─── Internal Write Helpers ───────────────────────────────────────────────────
+
+/**
+ * PATCH a single Airtable record's fields.
+ * Used for all write operations — field names must come from FIELDS const.
+ */
+async function airtablePatch(
+  table: string,
+  recordId: string,
+  fields: Record<string, unknown>,
+): Promise<void> {
+  const apiKey = process.env.AIRTABLE_API_KEY
+  const baseId = process.env.AIRTABLE_BASE_ID
+
+  if (!apiKey) throw new AirtableError('AIRTABLE_API_KEY environment variable is not set', 500)
+  if (!baseId) throw new AirtableError('AIRTABLE_BASE_ID environment variable is not set', 500)
+
+  const url = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(table)}/${recordId}`
+
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ fields }),
+  })
+
+  if (!res.ok) {
+    const { status } = res
+    if (status === 401) throw new AirtableError('Airtable authentication failed — check API key', 401)
+    if (status === 404) throw new AirtableError(`Record not found: "${recordId}"`, 404)
+    if (status === 422) throw new AirtableError('Airtable formula or field name error', 422)
+    if (status === 429) throw new AirtableError('Airtable rate limit exceeded — retry later', 429)
+    throw new AirtableError(`Airtable API error ${status}`, status)
+  }
+}
+
 // ─── Public Service Functions ─────────────────────────────────────────────────
 
 /** Fetch the complete recipe library (all pages). */
@@ -280,4 +318,35 @@ export async function getIngredients(recipeId: string): Promise<Ingredient[]> {
   })
   const records = await airtableFetchAll('Ingrédients', params)
   return records.map(({ id, fields }) => mapIngredient(id, fields))
+}
+
+/**
+ * Update the recipe assignment for a planning slot.
+ * Linked record field requires an array of IDs (Airtable REST convention).
+ * Pass recipeId=null to clear the slot.
+ * @param slotId   Airtable record ID of the Planning row (e.g. "recXXXXXXXXXXXXXX")
+ * @param recipeId Airtable record ID of the recipe to assign, or null to clear
+ */
+export async function updatePlanningSlot(
+  slotId: string,
+  recipeId: string | null,
+): Promise<void> {
+  await airtablePatch('Planning', slotId, {
+    [FIELDS.planning.recipeIds]: recipeId ? [recipeId] : [],
+  })
+}
+
+/**
+ * Update the omnivore annotation (notes) for a planning slot.
+ * Pass notes=null to clear the annotation.
+ * @param slotId Airtable record ID of the Planning row
+ * @param notes  Free-text omnivore variant (e.g. "+ lardons ×1"), or null to clear
+ */
+export async function updatePlanningSlotNotes(
+  slotId: string,
+  notes: string | null,
+): Promise<void> {
+  await airtablePatch('Planning', slotId, {
+    [FIELDS.planning.notes]: notes ?? null,
+  })
 }

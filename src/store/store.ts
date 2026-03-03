@@ -58,6 +58,8 @@ interface AppState {
   setLoadingPlan: (loading: boolean) => void
   /** Updates recipeId + recipeName on the slot with matching Airtable record id */
   updateSlot: (slotId: string, recipeId: string | null, recipeName: string | null) => void
+  /** Updates omnivore annotation (notes) on the slot with matching Airtable record id */
+  updateSlotNotes: (slotId: string, notes: string | null) => void
   /** Stub — full implementation in Story 3.1 */
   duplicateLastWeek: () => void
 
@@ -99,6 +101,18 @@ export const useAppStore = create<AppState>()((set) => ({
             ...state.weekPlan,
             slots: state.weekPlan.slots.map((slot) =>
               slot.id === slotId ? { ...slot, recipeId, recipeName } : slot,
+            ),
+          }
+        : null,
+    })),
+
+  updateSlotNotes: (slotId, notes) =>
+    set((state) => ({
+      weekPlan: state.weekPlan
+        ? {
+            ...state.weekPlan,
+            slots: state.weekPlan.slots.map((slot) =>
+              slot.id === slotId ? { ...slot, notes } : slot,
             ),
           }
         : null,
