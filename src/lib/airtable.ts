@@ -272,6 +272,44 @@ async function airtablePatch(
   }
 }
 
+/**
+ * PATCH multiple Airtable records in batches of 10 (Airtable batch limit).
+ * Processes chunks sequentially to respect Airtable's 5 req/s rate limit.
+ */
+async function airtableBatchPatch(
+  table: string,
+  records: { id: string; fields: Record<string, unknown> }[],
+): Promise<void> {
+  const apiKey = process.env.AIRTABLE_API_KEY
+  const baseId = process.env.AIRTABLE_BASE_ID
+
+  if (!apiKey) throw new AirtableError('AIRTABLE_API_KEY environment variable is not set', 500)
+  if (!baseId) throw new AirtableError('AIRTABLE_BASE_ID environment variable is not set', 500)
+
+  const url = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(table)}`
+
+  for (let i = 0; i < records.length; i += 10) {
+    const chunk = records.slice(i, i + 10)
+
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ records: chunk }),
+    })
+
+    if (!res.ok) {
+      const { status } = res
+      if (status === 401) throw new AirtableError('Airtable authentication failed — check API key', 401)
+      if (status === 422) throw new AirtableError('Airtable formula or field name error', 422)
+      if (status === 429) throw new AirtableError('Airtable rate limit exceeded — retry later', 429)
+      throw new AirtableError(`Airtable batch PATCH error ${status}`, status)
+    }
+  }
+}
+
 // ─── Public Service Functions ─────────────────────────────────────────────────
 
 /** Fetch the complete recipe library (all pages). */
@@ -349,4 +387,51 @@ export async function updatePlanningSlotNotes(
   await airtablePatch('Planning', slotId, {
     [FIELDS.planning.notes]: notes ?? null,
   })
+}
+
+/**
+ * Duplicates the previous week's recipe assignments onto the current week's slots.
+ * Matches slots by (day, slotType). Does NOT copy omnivore annotations (notes).
+ * @param fromWeek  ISO week string of the source week (e.g. "2026-W09")
+ * @param toWeek    ISO week string of the destination week (e.g. "2026-W10")
+ * @returns         Updated WeekPlan for toWeek with recipes copied from fromWeek
+ */
+export async function duplicateWeekPlan(fromWeek: string, toWeek: string): Promise<WeekPlan> {
+  const [fromPlan, toPlan] = await Promise.all([getWeekPlan(fromWeek), getWeekPlan(toWeek)])
+
+  // Build lookup from previous week: key = "${day}-${slotType}"
+  const fromSlotMap = new Map<string, MealSlot>()
+  for (const slot of fromPlan.slots) {
+    fromSlotMap.set(`${slot.day}-${slot.slotType}`, slot)
+  }
+
+  // Build patch records for all current week slots
+  const patchRecords = toPlan.slots.map((toSlot) => {
+    const key = `${toSlot.day}-${toSlot.slotType}`
+    const fromSlot = fromSlotMap.get(key)
+    return {
+      id: toSlot.id,
+      fields: {
+        [FIELDS.planning.recipeIds]: fromSlot?.recipeId ? [fromSlot.recipeId] : [],
+        [FIELDS.planning.recipeName]: fromSlot?.recipeName ?? null,
+        // Deliberately omitting FIELDS.planning.notes — annotations are not copied
+      },
+    }
+  })
+
+  await airtableBatchPatch('Planning', patchRecords)
+
+  // Reconstruct updated WeekPlan in memory — avoids an extra Airtable fetch
+  const updatedSlots = toPlan.slots.map((toSlot) => {
+    const key = `${toSlot.day}-${toSlot.slotType}`
+    const fromSlot = fromSlotMap.get(key)
+    return {
+      ...toSlot,
+      recipeId: fromSlot?.recipeId ?? null,
+      recipeName: fromSlot?.recipeName ?? null,
+      // notes deliberately not copied — left as-is from toPlan
+    }
+  })
+
+  return WeekPlanSchema.parse({ ...toPlan, slots: updatedSlots })
 }
