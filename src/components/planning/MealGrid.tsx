@@ -1,10 +1,39 @@
 'use client'
 
 import { useState } from 'react'
+import { useDroppable } from '@dnd-kit/core'
+import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/store'
 import { MealCell } from '@/components/planning/MealCell'
 import { SlotSwapSheet } from '@/components/planning/SlotSwapSheet'
 import type { DayIndex, MealSlot, MealType } from '@/types/index'
+
+// ─── Droppable Cell Wrapper ────────────────────────────────────────────────────
+
+interface DroppableCellProps {
+  id: string
+  slot: MealSlot | null
+  mealType: MealType
+  dayIndex: number
+  children: React.ReactNode
+}
+
+function DroppableCell({ id, slot, mealType, dayIndex, children }: DroppableCellProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id,
+    data: { slot, mealType, dayIndex },
+    disabled: slot === null,
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn('rounded', isOver && slot !== null && 'ring-2 ring-sage')}
+    >
+      {children}
+    </div>
+  )
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -79,14 +108,21 @@ export function MealGrid() {
                 ? recipes.find((r) => r.id === slot.recipeId)
                 : undefined
               return (
-                <MealCell
+                <DroppableCell
                   key={dayIndex}
+                  id={`cell-${dayIndex}-${mealType}`}
                   slot={slot}
-                  slotType={mealType}
-                  isVegetarian={recipe?.isVegetarian ?? false}
-                  variant="desktop"
-                  onTap={slot ? () => { setTappedSlot(slot); setSheetOpen(true) } : undefined}
-                />
+                  mealType={mealType}
+                  dayIndex={dayIndex}
+                >
+                  <MealCell
+                    slot={slot}
+                    slotType={mealType}
+                    isVegetarian={recipe?.isVegetarian ?? false}
+                    variant="desktop"
+                    onTap={slot ? () => { setTappedSlot(slot); setSheetOpen(true) } : undefined}
+                  />
+                </DroppableCell>
               )
             })}
           </div>
