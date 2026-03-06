@@ -5,12 +5,13 @@ import { RecipeSchema, IngredientSchema, MealSlotSchema, WeekPlanSchema } from '
 // CRITICAL: Only location in the codebase where French Airtable field names appear.
 // All other files import typed domain objects — no French strings outside this file.
 
-const FIELDS = {
+export const FIELDS = {
   recipe: {
     customId: 'ID Recette',
     name: 'Nom',
     category: 'Catégorie',
     isVegetarian: 'Végétarien',
+    prepTime: 'Temps de préparation',
     season: 'Saison',
     notes: 'Notes',
     ingredientIds: 'Ingrédients',
@@ -58,13 +59,13 @@ const DAY_NAME_TO_INDEX: Record<string, number> = {
   Dimanche: 6,
 }
 
-// Slot type display order (Petit-déjeuner first, Goûter last)
+// Slot type display order (Petit-déjeuner first, Dîner last in array, but Dîner is not last)
 const SLOT_TYPE_ORDER = [
   'Petit-déjeuner',
   'Déjeuner Midi',
   'Déjeuner Pique-nique',
-  'Dîner',
   'Goûter',
+  'Dîner',
 ] as const
 
 // ─── Day Parsing ──────────────────────────────────────────────────────────────
@@ -359,6 +360,15 @@ export async function getIngredients(recipeId: string): Promise<Ingredient[]> {
 }
 
 /**
+ * Fetch ALL ingredients from the Ingrédients table (used for shopping list aggregation).
+ * @returns Array of all ingredients in the system
+ */
+export async function getAllIngredients(): Promise<Ingredient[]> {
+  const records = await airtableFetchAll('Ingrédients')
+  return records.map(({ id, fields }) => mapIngredient(id, fields))
+}
+
+/**
  * Update the recipe assignment for a planning slot.
  * Linked record field requires an array of IDs (Airtable REST convention).
  * Pass recipeId=null to clear the slot.
@@ -387,6 +397,56 @@ export async function updatePlanningSlotNotes(
   await airtablePatch('Planning', slotId, {
     [FIELDS.planning.notes]: notes ?? null,
   })
+}
+
+// ─── Day Index → French Name ─────────────────────────────────────────────────
+
+const INDEX_TO_DAY_NAME = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'] as const
+
+/**
+ * Create a new planning slot row in Airtable.
+ * Used when dropping a recipe onto a cell that has no existing Airtable record.
+ * @returns The new Airtable record ID
+ */
+export async function createPlanningSlot(
+  date: string,
+  dayIndex: number,
+  mealType: string,
+  recipeId: string,
+): Promise<string> {
+  const apiKey = process.env.AIRTABLE_API_KEY
+  const baseId = process.env.AIRTABLE_BASE_ID
+
+  if (!apiKey) throw new AirtableError('AIRTABLE_API_KEY environment variable is not set', 500)
+  if (!baseId) throw new AirtableError('AIRTABLE_BASE_ID environment variable is not set', 500)
+
+  const url = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent('Planning')}`
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      fields: {
+        [FIELDS.planning.date]: date,
+        [FIELDS.planning.day]: INDEX_TO_DAY_NAME[dayIndex],
+        [FIELDS.planning.slotType]: mealType,
+        [FIELDS.planning.recipeIds]: [recipeId],
+      },
+    }),
+  })
+
+  if (!res.ok) {
+    const { status } = res
+    if (status === 422) throw new AirtableError('Airtable field/formula error on create', 422)
+    if (status === 429) throw new AirtableError('Airtable rate limit exceeded — retry later', 429)
+    throw new AirtableError(`Airtable create error ${status}`, status)
+  }
+
+  const data = (await res.json()) as { id: string }
+  return data.id
 }
 
 /**

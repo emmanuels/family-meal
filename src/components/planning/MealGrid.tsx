@@ -5,6 +5,7 @@ import { useDroppable } from '@dnd-kit/core'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store/store'
 import { MealCell } from '@/components/planning/MealCell'
+import { DraggableMealCell } from '@/components/planning/DraggableMealCell'
 import { SlotSwapSheet } from '@/components/planning/SlotSwapSheet'
 import type { DayIndex, MealSlot, MealType } from '@/types/index'
 
@@ -22,13 +23,12 @@ function DroppableCell({ id, slot, mealType, dayIndex, children }: DroppableCell
   const { setNodeRef, isOver } = useDroppable({
     id,
     data: { slot, mealType, dayIndex },
-    disabled: slot === null,
   })
 
   return (
     <div
       ref={setNodeRef}
-      className={cn('rounded', isOver && slot !== null && 'ring-2 ring-sage')}
+      className={cn('rounded', isOver && 'ring-2 ring-sage')}
     >
       {children}
     </div>
@@ -42,8 +42,8 @@ const MEAL_TYPE_ORDER: MealType[] = [
   'Petit-déjeuner',
   'Déjeuner Midi',
   'Déjeuner Pique-nique',
-  'Dîner',
   'Goûter',
+  'Dîner',
 ]
 
 const DAY_NAMES_SHORT_FR = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.']
@@ -107,6 +107,7 @@ export function MealGrid() {
               const recipe = slot?.recipeId
                 ? recipes.find((r) => r.id === slot.recipeId)
                 : undefined
+              const hasRecipe = slot && slot.recipeId
               return (
                 <DroppableCell
                   key={dayIndex}
@@ -115,13 +116,23 @@ export function MealGrid() {
                   mealType={mealType}
                   dayIndex={dayIndex}
                 >
-                  <MealCell
-                    slot={slot}
-                    slotType={mealType}
-                    isVegetarian={recipe?.isVegetarian ?? false}
-                    variant="desktop"
-                    onTap={slot ? () => { setTappedSlot(slot); setSheetOpen(true) } : undefined}
-                  />
+                  {hasRecipe && slot ? (
+                    <DraggableMealCell
+                      slot={slot}
+                      slotType={mealType}
+                      isVegetarian={recipe?.isVegetarian ?? false}
+                      variant="desktop"
+                      onTap={() => { setTappedSlot(slot); setSheetOpen(true) }}
+                    />
+                  ) : (
+                    <MealCell
+                      slot={slot}
+                      slotType={mealType}
+                      isVegetarian={recipe?.isVegetarian ?? false}
+                      variant="desktop"
+                      onTap={slot ? () => { setTappedSlot(slot); setSheetOpen(true) } : undefined}
+                    />
+                  )}
                 </DroppableCell>
               )
             })}

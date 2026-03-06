@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { useAppStore } from '@/store/store'
 import { MealCell } from '@/components/planning/MealCell'
 import { SlotSwapSheet } from '@/components/planning/SlotSwapSheet'
+import { CopyFAB } from '@/components/CopyFAB'
 import { cn } from '@/lib/utils'
 import type { DayIndex, MealSlot, MealType } from '@/types/index'
 
@@ -14,8 +15,8 @@ const MEAL_TYPE_ORDER: MealType[] = [
   'Petit-déjeuner',
   'Déjeuner Midi',
   'Déjeuner Pique-nique',
-  'Dîner',
   'Goûter',
+  'Dîner',
 ]
 
 const SWIPE_THRESHOLD = 40 // px
@@ -165,6 +166,9 @@ export function DaySwipeView() {
           onOpenChange={handleSheetOpenChange}
         />
       )}
+
+      {/* Copy FAB — persistent button to copy shopping list */}
+      <CopyFAB />
     </div>
   )
 }

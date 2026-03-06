@@ -26,22 +26,28 @@ export function MobilePlanningView() {
 
   useEffect(() => {
     let cancelled = false
-    const { setWeekPlan, setLoadingPlan, setRecipes, setLoadingRecipes } = useAppStore.getState()
+    const { setWeekPlan, setLoadingPlan, setRecipes, setLoadingRecipes, setIngredients } = useAppStore.getState()
 
     const load = async () => {
       setError(false)
       setLoadingPlan(true)
       setLoadingRecipes(true)
       try {
-        const [planRes, recipesRes] = await Promise.all([
+        const [planRes, recipesRes, ingredientsRes] = await Promise.all([
           fetch(`/api/planning?week=${currentWeek}`),
           fetch('/api/recipes'),
+          fetch('/api/ingredients'),
         ])
-        if (!planRes.ok || !recipesRes.ok) throw new Error('Fetch failed')
-        const [weekPlan, recipes] = await Promise.all([planRes.json(), recipesRes.json()])
+        if (!planRes.ok || !recipesRes.ok || !ingredientsRes.ok) throw new Error('Fetch failed')
+        const [weekPlan, recipes, ingredients] = await Promise.all([
+          planRes.json(),
+          recipesRes.json(),
+          ingredientsRes.json(),
+        ])
         if (!cancelled) {
           setWeekPlan(weekPlan)
           setRecipes(recipes)
+          setIngredients(ingredients)
         }
       } catch {
         if (!cancelled) setError(true)

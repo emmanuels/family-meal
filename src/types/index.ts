@@ -11,7 +11,7 @@ export type MealType =
   | 'Goûter'
 
 /** Season of a recipe */
-export type Season = 'Toutes saisons' | 'Printemps / Été' | 'Automne / Hiver'
+export type Season = 'Toutes saisons' | 'Printemps-Été' | 'Automne-Hiver'
 
 /** ISO week day: 0 = Monday … 6 = Sunday (ISO convention — never Sunday = 0) */
 export type DayIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6
@@ -25,14 +25,14 @@ export const MealTypeSchema = z.enum([
   'Petit-déjeuner',
   'Déjeuner Midi',
   'Déjeuner Pique-nique',
-  'Dîner',
   'Goûter',
+  'Dîner',
 ])
 
 export const SeasonSchema = z.enum([
   'Toutes saisons',
-  'Printemps / Été',
-  'Automne / Hiver',
+  'Printemps-Été',
+  'Automne-Hiver',
 ])
 
 export const RecipeSchema = z.object({

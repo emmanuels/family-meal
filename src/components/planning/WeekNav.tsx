@@ -1,5 +1,6 @@
 'use client'
 
+import { Printer } from 'lucide-react'
 import { useAppStore } from '@/store/store'
 import { getAdjacentWeek } from '@/lib/utils'
 
@@ -87,6 +88,14 @@ export function WeekNav() {
         className="p-1 text-lg text-charcoal/60 disabled:opacity-30"
       >
         ›
+      </button>
+
+      <button
+        onClick={() => window.open(`/print?week=${currentWeek}`, '_blank', 'noopener,noreferrer')}
+        aria-label="Imprimer le calendrier"
+        className="p-1 text-charcoal/60 hover:text-charcoal"
+      >
+        <Printer size={16} />
       </button>
     </div>
   )

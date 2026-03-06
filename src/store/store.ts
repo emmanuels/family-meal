@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { DayIndex, Recipe, WeekPlan } from '@/types/index'
+import type { DayIndex, Ingredient, Recipe, WeekPlan } from '@/types/index'
 import { getAdjacentWeek } from '@/lib/utils'
 
 // ─── Duplicate Result Type ────────────────────────────────────────────────────
@@ -72,11 +72,13 @@ interface AppState {
   // ── Recipes Slice ────────────────────────────────────────────────────────
   recipes: Recipe[]
   isLoadingRecipes: boolean
+  ingredientMap: Record<string, Ingredient> // keyed by Airtable record ID
 
   setRecipes: (recipes: Recipe[]) => void
   /** Optimistic insert — prepends recipe to array */
   addRecipe: (recipe: Recipe) => void
   setLoadingRecipes: (loading: boolean) => void
+  setIngredients: (ingredients: Ingredient[]) => void
 
   // ── UI Slice ─────────────────────────────────────────────────────────────
   selectedDay: DayIndex // 0–6 (0=Mon … 6=Sun); initialized to current weekday
@@ -186,12 +188,16 @@ export const useAppStore = create<AppState>()((set, get) => ({
   // ── Recipes Slice ──────────────────────────────────────────────────────────
   recipes: [],
   isLoadingRecipes: false,
+  ingredientMap: {},
 
   setRecipes: (recipes) => set({ recipes }),
 
   addRecipe: (recipe) => set((state) => ({ recipes: [recipe, ...state.recipes] })),
 
   setLoadingRecipes: (loading) => set({ isLoadingRecipes: loading }),
+
+  setIngredients: (ingredients) =>
+    set({ ingredientMap: Object.fromEntries(ingredients.map((i) => [i.id, i])) }),
 
   // ── UI Slice ───────────────────────────────────────────────────────────────
   selectedDay: getCurrentDay(),

@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { z, ZodError } from 'zod'
-import { getWeekPlan, updatePlanningSlot, updatePlanningSlotNotes, duplicateWeekPlan, AirtableError } from '@/lib/airtable'
+import { getWeekPlan, updatePlanningSlot, updatePlanningSlotNotes, duplicateWeekPlan, createPlanningSlot, AirtableError } from '@/lib/airtable'
 
 export async function GET(request: NextRequest) {
   const week = request.nextUrl.searchParams.get('week')
@@ -87,9 +87,14 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const { slotId, recipeId, notes } = PatchBodySchema.parse(body)
-    if (recipeId !== undefined) {
+    
+    // Support both recipeId and notes in a single call (for Story 3.6 swaps)
+    if (recipeId !== undefined && notes !== undefined) {
       await updatePlanningSlot(slotId, recipeId ?? null)
-    } else {
+      await updatePlanningSlotNotes(slotId, notes ?? null)
+    } else if (recipeId !== undefined) {
+      await updatePlanningSlot(slotId, recipeId ?? null)
+    } else if (notes !== undefined) {
       await updatePlanningSlotNotes(slotId, notes ?? null)
     }
     return Response.json({ ok: true })
@@ -102,7 +107,43 @@ export async function PATCH(request: NextRequest) {
     }
     if (err instanceof ZodError) {
       return Response.json(
-        { error: 'Invalid request body — expected { slotId, recipeId? } or { slotId, notes? }', code: 400 },
+        { error: 'Invalid request body — expected { slotId, recipeId? } or { slotId, notes? } or both', code: 400 },
+        { status: 400 },
+      )
+    }
+    return Response.json({ error: 'Internal server error', code: 500 }, { status: 500 })
+  }
+}
+
+const PutBodySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  dayIndex: z.number().min(0).max(6),
+  mealType: z.string().min(1),
+  recipeId: z.string().min(1),
+})
+
+export async function PUT(request: NextRequest) {
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return Response.json({ error: 'Invalid JSON body', code: 400 }, { status: 400 })
+  }
+
+  try {
+    const { date, dayIndex, mealType, recipeId } = PutBodySchema.parse(body)
+    const id = await createPlanningSlot(date, dayIndex, mealType, recipeId)
+    return Response.json({ id })
+  } catch (err) {
+    if (err instanceof AirtableError) {
+      return Response.json(
+        { error: err.message, code: err.statusCode },
+        { status: err.statusCode },
+      )
+    }
+    if (err instanceof ZodError) {
+      return Response.json(
+        { error: 'Invalid request body — expected { date, dayIndex, mealType, recipeId }', code: 400 },
         { status: 400 },
       )
     }

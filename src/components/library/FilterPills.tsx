@@ -2,14 +2,14 @@
 
 import { cn } from '@/lib/utils'
 
-export type FilterCategory = 'Tous' | 'Petit-déjeuner' | 'Déjeuner' | 'Dîner' | 'Goûter'
+export type FilterCategory = 'Tous' | 'Petit-déjeuner' | 'Déjeuner' | 'Goûter' | 'Dîner'
 
 const FILTER_CATEGORIES: FilterCategory[] = [
   'Tous',
   'Petit-déjeuner',
   'Déjeuner',
-  'Dîner',
   'Goûter',
+  'Dîner',
 ]
 
 interface FilterPillsProps {
