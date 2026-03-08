@@ -97,9 +97,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       )
     }
 
+    // Generate next customId (R001, R002, ...) from existing recipes
+    const existingRecipes = await getRecipes(familyCode)
+    const maxNum = existingRecipes.reduce((max, r) => {
+      const match = r.customId.match(/^R(\d+)$/)
+      if (!match) return max
+      return Math.max(max, parseInt(match[1], 10))
+    }, 0)
+    const nextCustomId = `R${String(maxNum + 1).padStart(3, '0')}`
+
     // Build Airtable request body using FIELDS mapping
     const airtableBody = {
       fields: {
+        [FIELDS.recipe.customId]: nextCustomId,
         [FIELDS.recipe.name]: validatedData.name,
         [FIELDS.recipe.category]: validatedData.category,
         [FIELDS.recipe.isVegetarian]: validatedData.isVegetarian ? 'TRUE' : 'FALSE',
@@ -177,7 +187,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Build response with created recipe
     const createdRecipe: Recipe = {
       id: recordId,
-      customId: '', // Will be populated by Airtable formula
+      customId: nextCustomId,
       name: validatedData.name,
       category: validatedData.category,
       isVegetarian: validatedData.isVegetarian,
