@@ -103,7 +103,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         [FIELDS.recipe.name]: validatedData.name,
         [FIELDS.recipe.category]: validatedData.category,
         [FIELDS.recipe.isVegetarian]: validatedData.isVegetarian ? 'TRUE' : 'FALSE',
-        [FIELDS.recipe.prepTime]: validatedData.prepTime,
         [FIELDS.recipe.season]: validatedData.season,
         [FIELDS.recipe.famille]: familyCode,
       },

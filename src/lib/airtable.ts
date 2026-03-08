@@ -11,7 +11,7 @@ export const FIELDS = {
     name: 'Nom',
     category: 'Catégorie',
     isVegetarian: 'Végétarien',
-    prepTime: 'Temps de préparation',
+    prepTime: 'Temps de prépa (min)',
     season: 'Saison',
     notes: 'Notes',
     ingredientIds: 'Ingrédients',
