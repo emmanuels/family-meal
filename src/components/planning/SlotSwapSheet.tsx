@@ -178,7 +178,10 @@ export function SlotSwapSheet({ slot, slotType, slotContext, open, onOpenChange 
           ingredients: [],
         }),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({})) as { error?: string; message?: string }
+        throw new Error(errData.message || errData.error || `HTTP ${res.status}`)
+      }
 
       const created = await res.json() as Recipe
       useAppStore.getState().addRecipe(created)
@@ -186,8 +189,9 @@ export function SlotSwapSheet({ slot, slotType, slotContext, open, onOpenChange 
       setNewRecipeName('')
       setNewRecipeVegetarian(false)
       await handleSelect(created)
-    } catch {
-      toast.error('Impossible de créer la recette. Réessayez.')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erreur inconnue'
+      toast.error(`Impossible de créer la recette : ${msg}`)
     } finally {
       setCreatingRecipe(false)
     }
