@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 import {
   DndContext,
@@ -20,6 +21,11 @@ import { RecipeCard } from '@/components/library/RecipeCard'
 import { ShoppingPanel } from '@/components/ShoppingPanel'
 import { CopyFAB } from '@/components/CopyFAB'
 import type { DayIndex, MealSlot, MealType, Recipe } from '@/types/index'
+
+const QuickAddDrawer = dynamic(
+  () => import('@/components/recipe-form/QuickAddDrawer').then((m) => ({ default: m.QuickAddDrawer })),
+  { ssr: false }
+)
 
 function LoadingSkeleton() {
   return (
@@ -377,6 +383,9 @@ export function DesktopPlanningView() {
 
       {/* Copy FAB — persistent button to copy shopping list */}
       <CopyFAB />
+
+      {/* Quick-Add Drawer — lazy-loaded slide-in panel for recipe creation (desktop only) */}
+      <QuickAddDrawer />
 
       {/* Drag overlay — renders in a portal above all content */}
       <DragOverlay>

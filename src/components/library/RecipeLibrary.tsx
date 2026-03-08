@@ -20,6 +20,7 @@ export function RecipeLibrary() {
   const recipes = useAppStore((s) => s.recipes)
   const isLoadingRecipes = useAppStore((s) => s.isLoadingRecipes)
   const isLoadingPlan = useAppStore((s) => s.isLoadingPlan)
+  const toggleQuickAdd = useAppStore((s) => s.toggleQuickAdd)
 
   // Show skeleton whenever the initial data fetch is in progress.
   // isLoadingPlan starts as true (store default), so the skeleton appears immediately
@@ -38,8 +39,17 @@ export function RecipeLibrary() {
   return (
     <div className="flex h-full flex-col">
       {/* Sidebar header */}
-      <div className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-charcoal/60">
-        Bibliothèque
+      <div className="flex items-center justify-between px-4 py-3">
+        <span className="text-xs font-semibold uppercase tracking-wide text-charcoal/60">Bibliothèque</span>
+        <button
+          type="button"
+          onClick={toggleQuickAdd}
+          className="rounded bg-[#C8E6D9] px-2 py-0.5 text-sm font-medium text-[#2D2D2D] hover:bg-[#B5DCC8]"
+          aria-label="Ajouter une recette"
+          title="Ajouter une recette"
+        >
+          +
+        </button>
       </div>
       <div className="border-b border-warm/40" />
 
