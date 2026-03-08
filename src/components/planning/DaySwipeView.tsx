@@ -5,7 +5,7 @@ import { useAppStore } from '@/store/store'
 import { MealCell } from '@/components/planning/MealCell'
 import { SlotSwapSheet } from '@/components/planning/SlotSwapSheet'
 import { CopyFAB } from '@/components/CopyFAB'
-import { cn } from '@/lib/utils'
+import { cn, getDateStrFromWeekStart } from '@/lib/utils'
 import type { DayIndex, MealSlot, MealType } from '@/types/index'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -44,7 +44,12 @@ function getTodayIndex(): number {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function DaySwipeView() {
+interface DaySwipeViewProps {
+  /** When true, slot tapping is disabled (past week read-only mode) */
+  readOnly?: boolean
+}
+
+export function DaySwipeView({ readOnly = false }: DaySwipeViewProps) {
   const weekPlan = useAppStore((s) => s.weekPlan)
   const selectedDay = useAppStore((s) => s.selectedDay)
   const recipes = useAppStore((s) => s.recipes)
@@ -54,13 +59,14 @@ export function DaySwipeView() {
   const touchStartX = useRef<number>(0)
   const today = getTodayIndex()
 
-  // Slot swap sheet state
+  // Slot swap sheet state — tappedSlot for edit mode, createContext for creation mode
   const [tappedSlot, setTappedSlot] = useState<MealSlot | null>(null)
+  const [createContext, setCreateContext] = useState<{ date: string; day: DayIndex; slotType: MealType } | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
 
   function handleSheetOpenChange(open: boolean) {
     setSheetOpen(open)
-    if (!open) setTimeout(() => setTappedSlot(null), 350)
+    if (!open) setTimeout(() => { setTappedSlot(null); setCreateContext(null) }, 350)
   }
 
   // Build slot list for selected day in display order
@@ -155,16 +161,29 @@ export function DaySwipeView() {
               slotType={mealType}
               isVegetarian={isVegetarian}
               variant="mobile"
-              onTap={displaySlot ? () => { setTappedSlot(displaySlot); setSheetOpen(true) } : undefined}
+              readOnly={readOnly}
+              onTap={
+                !readOnly && displaySlot
+                  ? () => { setTappedSlot(displaySlot); setCreateContext(null); setSheetOpen(true) }
+                  : !readOnly && !displaySlot && weekPlan
+                  ? () => {
+                      setTappedSlot(null)
+                      setCreateContext({ date: getDateStrFromWeekStart(weekPlan.weekStart, selectedDay), day: selectedDay as DayIndex, slotType: mealType })
+                      setSheetOpen(true)
+                    }
+                  : undefined
+              }
             />
           )
         })}
       </div>
 
-      {/* Bottom sheet for slot swap — only mounted when a slot has been tapped */}
-      {tappedSlot && (
+      {/* Bottom sheet — edit mode (tappedSlot) or creation mode (createContext) */}
+      {(tappedSlot || createContext) && (
         <SlotSwapSheet
           slot={tappedSlot}
+          slotType={tappedSlot?.slotType ?? createContext!.slotType}
+          slotContext={createContext ?? undefined}
           open={sheetOpen}
           onOpenChange={handleSheetOpenChange}
         />

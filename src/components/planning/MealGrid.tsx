@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
-import { cn } from '@/lib/utils'
+import { cn, getDateStrFromWeekStart } from '@/lib/utils'
 import { useAppStore } from '@/store/store'
 import { MealCell } from '@/components/planning/MealCell'
 import { DraggableMealCell } from '@/components/planning/DraggableMealCell'
@@ -65,16 +65,22 @@ function getDayHeader(weekStart: string, dayIndex: number): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function MealGrid() {
+interface MealGridProps {
+  /** When true, drag-and-drop and slot editing are disabled (past week read-only mode) */
+  readOnly?: boolean
+}
+
+export function MealGrid({ readOnly = false }: MealGridProps) {
   const weekPlan = useAppStore((s) => s.weekPlan)
   const recipes = useAppStore((s) => s.recipes)
 
   const [tappedSlot, setTappedSlot] = useState<MealSlot | null>(null)
+  const [createContext, setCreateContext] = useState<{ date: string; day: DayIndex; slotType: MealType } | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
 
   function handleSheetOpenChange(open: boolean) {
     setSheetOpen(open)
-    if (!open) setTimeout(() => setTappedSlot(null), 350)
+    if (!open) setTimeout(() => { setTappedSlot(null); setCreateContext(null) }, 350)
   }
 
   return (
@@ -112,6 +118,21 @@ export function MealGrid() {
                 ? { ...slot, recipeName: recipe.name }
                 : slot
               const hasRecipe = displaySlot && displaySlot.recipeId
+              // Read-only mode (past week): skip dnd-kit wrappers entirely to avoid DndContext dependency
+              if (readOnly) {
+                return (
+                  <div key={dayIndex} className="rounded">
+                    <MealCell
+                      slot={displaySlot}
+                      slotType={mealType}
+                      isVegetarian={recipe?.isVegetarian ?? false}
+                      variant="desktop"
+                      readOnly
+                    />
+                  </div>
+                )
+              }
+
               return (
                 <DroppableCell
                   key={dayIndex}
@@ -126,7 +147,7 @@ export function MealGrid() {
                       slotType={mealType}
                       isVegetarian={recipe?.isVegetarian ?? false}
                       variant="desktop"
-                      onTap={() => { setTappedSlot(displaySlot); setSheetOpen(true) }}
+                      onTap={() => { setTappedSlot(displaySlot); setCreateContext(null); setSheetOpen(true) }}
                     />
                   ) : (
                     <MealCell
@@ -134,7 +155,17 @@ export function MealGrid() {
                       slotType={mealType}
                       isVegetarian={recipe?.isVegetarian ?? false}
                       variant="desktop"
-                      onTap={displaySlot ? () => { setTappedSlot(displaySlot); setSheetOpen(true) } : undefined}
+                      onTap={
+                        displaySlot
+                          ? () => { setTappedSlot(displaySlot); setCreateContext(null); setSheetOpen(true) }
+                          : weekPlan
+                          ? () => {
+                              setTappedSlot(null)
+                              setCreateContext({ date: getDateStrFromWeekStart(weekPlan.weekStart, dayIndex), day: dayIndex as DayIndex, slotType: mealType })
+                              setSheetOpen(true)
+                            }
+                          : undefined
+                      }
                     />
                   )}
                 </DroppableCell>
@@ -144,8 +175,14 @@ export function MealGrid() {
         ))}
       </div>
 
-      {tappedSlot && (
-        <SlotSwapSheet slot={tappedSlot} open={sheetOpen} onOpenChange={handleSheetOpenChange} />
+      {(tappedSlot || createContext) && (
+        <SlotSwapSheet
+          slot={tappedSlot}
+          slotType={tappedSlot?.slotType ?? createContext!.slotType}
+          slotContext={createContext ?? undefined}
+          open={sheetOpen}
+          onOpenChange={handleSheetOpenChange}
+        />
       )}
     </div>
   )

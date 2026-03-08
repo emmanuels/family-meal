@@ -13,6 +13,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core'
 import { useAppStore } from '@/store/store'
+import { getCurrentWeekId, computeWeekDelta } from '@/lib/utils'
 import { WeekNav } from '@/components/planning/WeekNav'
 import { MealGrid } from '@/components/planning/MealGrid'
 import { ErrorBanner } from '@/components/planning/ErrorBanner'
@@ -67,6 +68,8 @@ export function DesktopPlanningView() {
   const isLoadingPlan = useAppStore((s) => s.isLoadingPlan)
   const isDuplicating = useAppStore((s) => s.isDuplicating)
 
+  const isPastWeek = computeWeekDelta(currentWeek, getCurrentWeekId()) < 0
+
   // AC2: Extract grid drag handler (Story 3.7)
   async function handleGridDrag(
     event: DragEndEvent,
@@ -93,33 +96,90 @@ export function DesktopPlanningView() {
 
     try {
       if (!targetSlot || !targetSlot.recipeId) {
-        // ── MOVE: target is empty ──
-        updateSlot(slot.id, null, null)
-        if (targetSlot) {
-          updateSlot(targetSlot.id, sourceRecipeId, sourceRecipeName)
+        if (!targetSlot) {
+          // ── CREATE: target cell has no Airtable record — use PUT to create it ──
+          const overData = event.over?.data.current
+          const targetMealType = overData?.mealType as MealType
+          const targetDayIndex = overData?.dayIndex as number
+
+          // Compute the date for this dayIndex from weekStart
+          const mondayDate = new Date(weekPlan.weekStart + 'T00:00:00Z')
+          const slotDate = new Date(mondayDate)
+          slotDate.setUTCDate(mondayDate.getUTCDate() + targetDayIndex)
+          const dateStr = slotDate.toISOString().slice(0, 10)
+
+          // Optimistic: clear source slot
+          updateSlot(slot.id, null, null)
+
+          const [clearRes, createRes] = await withTimeout(
+            Promise.all([
+              fetch('/api/planning', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ slotId: slot.id, recipeId: null }),
+              }),
+              fetch('/api/planning', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  date: dateStr,
+                  dayIndex: targetDayIndex,
+                  mealType: targetMealType,
+                  recipeId: sourceRecipeId,
+                }),
+              }),
+            ]),
+            5000
+          )
+
+          if (!clearRes.ok || !createRes.ok) {
+            throw new Error(`HTTP ${!clearRes.ok ? clearRes.status : createRes.status}`)
+          }
+
+          const created = await createRes.json() as { id: string }
+          const newSlot: MealSlot = {
+            id: created.id,
+            date: dateStr,
+            day: targetDayIndex as DayIndex,
+            slotType: targetMealType,
+            recipeId: sourceRecipeId,
+            recipeName: sourceRecipeName,
+            notes: sourceNotes,
+          }
+          const current = useAppStore.getState().weekPlan
+          if (current) {
+            useAppStore.getState().setWeekPlan({ ...current, slots: [...current.slots, newSlot] })
+          }
+          return
         }
 
-        await withTimeout(
+        // ── MOVE: target has an Airtable record but is empty (no recipe) ──
+        updateSlot(slot.id, null, null)
+        updateSlot(targetSlot.id, sourceRecipeId, sourceRecipeName)
+
+        const [moveRes1, moveRes2] = await withTimeout(
           Promise.all([
             fetch('/api/planning', {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ slotId: slot.id, recipeId: null }),
             }),
-            targetSlot
-              ? fetch('/api/planning', {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    slotId: targetSlot.id,
-                    recipeId: sourceRecipeId,
-                    ...(sourceNotes && { notes: sourceNotes }),
-                  }),
-                })
-              : Promise.resolve(new Response()),
+            fetch('/api/planning', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                slotId: targetSlot.id,
+                recipeId: sourceRecipeId,
+                ...(sourceNotes && { notes: sourceNotes }),
+              }),
+            }),
           ]),
           5000
         )
+
+        if (!moveRes1.ok || !moveRes2.ok) {
+          throw new Error(`HTTP ${!moveRes1.ok ? moveRes1.status : moveRes2.status}`)
+        }
       } else {
         // ── SWAP: target has a recipe ──
         const targetRecipeId = targetSlot.recipeId
@@ -251,6 +311,7 @@ export function DesktopPlanningView() {
   }
 
   function handleDragStart(event: DragStartEvent) {
+    if (isPastWeek) return
     const recipe = event.active.data.current?.recipe as Recipe | undefined
     const slot = event.active.data.current?.slot as MealSlot | undefined
     
@@ -359,17 +420,19 @@ export function DesktopPlanningView() {
           ) : (
             <>
               <WeekNav />
-              <div className="flex items-center justify-end border-b border-warm/40 px-4 py-2">
-                <button
-                  onClick={handleDuplicate}
-                  disabled={isDuplicating || isLoadingPlan}
-                  className="rounded-md bg-sage px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-                >
-                  {isDuplicating ? 'Duplication…' : 'Dupliquer la semaine précédente'}
-                </button>
-              </div>
+              {!isPastWeek && (
+                <div className="flex items-center justify-end border-b border-warm/40 px-4 py-2">
+                  <button
+                    onClick={handleDuplicate}
+                    disabled={isDuplicating || isLoadingPlan}
+                    className="rounded-md bg-sage px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                  >
+                    {isDuplicating ? 'Duplication…' : 'Dupliquer la semaine précédente'}
+                  </button>
+                </div>
+              )}
               <div className="flex-1 p-4">
-                <MealGrid />
+                <MealGrid readOnly={isPastWeek} />
               </div>
             </>
           )}

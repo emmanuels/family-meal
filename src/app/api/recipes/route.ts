@@ -3,6 +3,7 @@ import { z, ZodError } from 'zod'
 import type { Recipe } from '@/types/index'
 import { MealTypeSchema, SeasonSchema } from '@/types/index'
 import { getRecipes, AirtableError, FIELDS } from '@/lib/airtable'
+import { getFamilyCodeFromRequest } from '@/lib/auth'
 
 // ─── Request Validation Schemas ───────────────────────────────────────────────
 
@@ -27,9 +28,14 @@ type IngredientInput = z.infer<typeof IngredientInputSchema>
 
 // ─── GET Handler (Read all recipes) ────────────────────────────────────────────
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const familyCode = getFamilyCodeFromRequest(request)
+  if (!familyCode) {
+    return Response.json({ error: 'Authentication required', code: 401 }, { status: 401 })
+  }
+
   try {
-    const recipes = await getRecipes()
+    const recipes = await getRecipes(familyCode)
     return Response.json(recipes)
   } catch (err) {
     if (err instanceof AirtableError) {
@@ -51,6 +57,11 @@ export async function GET() {
 // ─── POST Handler (Create new recipe) ──────────────────────────────────────────
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const familyCode = getFamilyCodeFromRequest(request)
+  if (!familyCode) {
+    return NextResponse.json({ error: 'Authentication required', code: 401 }, { status: 401 })
+  }
+
   try {
     // Parse request body
     const body = await request.json()
@@ -75,10 +86,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Get environment variables
-    const baseId = process.env.NEXT_PUBLIC_AIRTABLE_BASE_ID
-    const apiToken = process.env.AIRTABLE_API_TOKEN
+    const baseId = process.env.AIRTABLE_BASE_ID
+    const apiKey = process.env.AIRTABLE_API_KEY
 
-    if (!baseId || !apiToken) {
+    if (!baseId || !apiKey) {
       console.error('Missing Airtable credentials')
       return NextResponse.json(
         { error: 'Server configuration error' },
@@ -94,6 +105,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         [FIELDS.recipe.isVegetarian]: validatedData.isVegetarian,
         [FIELDS.recipe.prepTime]: validatedData.prepTime,
         [FIELDS.recipe.season]: validatedData.season,
+        [FIELDS.recipe.famille]: familyCode,
       },
     }
 
@@ -102,7 +114,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const airtableResponse = await fetch(airtableUrl, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiToken}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(airtableBody),
@@ -138,7 +150,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const ingredientResponse = await fetch(ingredientUrl, {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${apiToken}`,
+            Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -148,6 +160,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
               [FIELDS.ingredient.unit]: ingredient.unit,
               [FIELDS.ingredient.rayon]: ingredient.rayon,
               [FIELDS.ingredient.recipeIds]: [recordId],
+              [FIELDS.ingredient.famille]: familyCode,
             },
           }),
         })

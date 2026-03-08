@@ -1,49 +1,10 @@
 import { create } from 'zustand'
 import type { DayIndex, Ingredient, Recipe, WeekPlan } from '@/types/index'
-import { getAdjacentWeek } from '@/lib/utils'
+import { getAdjacentWeek, getCurrentWeekId } from '@/lib/utils'
 
 // ─── Duplicate Result Type ────────────────────────────────────────────────────
 
 export type DuplicateResult = 'ok' | 'empty' | 'error'
-
-// ─── ISO Week Helpers ─────────────────────────────────────────────────────────
-
-function getCurrentWeekId(): string {
-  const now = new Date()
-  const year = now.getUTCFullYear()
-
-  // Jan 4 is always in ISO week 1 (ISO 8601)
-  const jan4 = new Date(Date.UTC(year, 0, 4))
-  const dow = jan4.getUTCDay() === 0 ? 7 : jan4.getUTCDay() // Mon=1 … Sun=7
-
-  // Monday of week 1
-  const weekOneMon = new Date(jan4)
-  weekOneMon.setUTCDate(jan4.getUTCDate() - (dow - 1))
-
-  // Days since week 1 Monday (UTC)
-  const daysSinceWeekOne = Math.floor(
-    (Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) -
-      weekOneMon.getTime()) /
-      86_400_000,
-  )
-
-  const weekNum = Math.floor(daysSinceWeekOne / 7) + 1
-
-  // Edge case: early January may compute week < 1 → last week of previous year
-  // Use Dec 28 (always in the last ISO week of any year) to find the correct week number
-  if (weekNum < 1) {
-    const dec28Prev = new Date(Date.UTC(year - 1, 11, 28))
-    const jan4Prev = new Date(Date.UTC(year - 1, 0, 4))
-    const dowPrev = jan4Prev.getUTCDay() === 0 ? 7 : jan4Prev.getUTCDay()
-    const weekOneMonPrev = new Date(jan4Prev)
-    weekOneMonPrev.setUTCDate(jan4Prev.getUTCDate() - (dowPrev - 1))
-    const lastWeek =
-      Math.floor((dec28Prev.getTime() - weekOneMonPrev.getTime()) / 86_400_000 / 7) + 1
-    return `${year - 1}-W${String(lastWeek).padStart(2, '0')}`
-  }
-
-  return `${year}-W${String(weekNum).padStart(2, '0')}`
-}
 
 function getCurrentDay(): DayIndex {
   const dow = new Date().getUTCDay() // 0=Sun, 1=Mon … 6=Sat

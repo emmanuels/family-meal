@@ -15,6 +15,7 @@ export const FIELDS = {
     season: 'Saison',
     notes: 'Notes',
     ingredientIds: 'Ingrédients',
+    famille: 'Famille',
   },
   planning: {
     date: 'Semaine',
@@ -23,6 +24,7 @@ export const FIELDS = {
     recipeIds: 'ID Recette',
     recipeName: 'Nom recette',
     notes: 'Notes',
+    famille: 'Famille',
   },
   ingredient: {
     customId: 'ID Ingrédient',
@@ -31,6 +33,7 @@ export const FIELDS = {
     quantity: 'Quantité',
     unit: 'Unité',
     rayon: 'Rayon',
+    famille: 'Famille',
   },
 } as const
 
@@ -124,6 +127,18 @@ function weekIdToDateRange(weekId: string): { start: string; end: string } {
 
   const fmt = (d: Date) => d.toISOString().slice(0, 10)
   return { start: fmt(monday), end: fmt(sunday) }
+}
+
+// ─── Formula Helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Strip `"` characters from a family code before interpolating it into an
+ * Airtable formula string literal.  A `"` inside `{Famille}="K"E"` would
+ * produce malformed syntax; stripping is safe because FAMILY_CODE is a
+ * server-controlled env var and family codes are never user-supplied strings.
+ */
+function escapeFamilyCode(code: string): string {
+  return code.replace(/"/g, '')
 }
 
 // ─── Internal Fetch Helpers ───────────────────────────────────────────────────
@@ -313,22 +328,26 @@ async function airtableBatchPatch(
 
 // ─── Public Service Functions ─────────────────────────────────────────────────
 
-/** Fetch the complete recipe library (all pages). */
-export async function getRecipes(): Promise<Recipe[]> {
-  const records = await airtableFetchAll('Recettes')
+/** Fetch the complete recipe library scoped to the given family. */
+export async function getRecipes(familyCode: string): Promise<Recipe[]> {
+  const params = new URLSearchParams({
+    filterByFormula: `{${FIELDS.recipe.famille}}="${escapeFamilyCode(familyCode)}"`,
+  })
+  const records = await airtableFetchAll('Recettes', params)
   return records.map(({ id, fields }) => mapRecipe(id, fields))
 }
 
 /**
- * Fetch all planning slots for a given ISO week.
- * @param weekId  ISO week string "YYYY-WWW" (e.g. "2026-W10")
+ * Fetch all planning slots for a given ISO week scoped to the given family.
+ * @param weekId      ISO week string "YYYY-WWW" (e.g. "2026-W10")
+ * @param familyCode  Family identifier from the fm_family cookie (e.g. "K&E")
  */
-export async function getWeekPlan(weekId: string): Promise<WeekPlan> {
+export async function getWeekPlan(weekId: string, familyCode: string): Promise<WeekPlan> {
   const { start, end } = weekIdToDateRange(weekId)
 
   // Field names referenced via FIELDS const — never hardcoded in formula strings
   const params = new URLSearchParams({
-    filterByFormula: `AND(NOT(IS_BEFORE({${FIELDS.planning.date}}, '${start}')), NOT(IS_AFTER({${FIELDS.planning.date}}, '${end}')))`,
+    filterByFormula: `AND({${FIELDS.planning.famille}}="${escapeFamilyCode(familyCode)}", NOT(IS_BEFORE({${FIELDS.planning.date}}, '${start}')), NOT(IS_AFTER({${FIELDS.planning.date}}, '${end}')))`,
   })
 
   const records = await airtableFetchAll('Planning', params)
@@ -347,24 +366,28 @@ export async function getWeekPlan(weekId: string): Promise<WeekPlan> {
 }
 
 /**
- * Fetch all ingredients for a given recipe's Airtable record ID.
- * @param recipeId  Airtable record ID (e.g. "rec3UYmUC66UCFfoF")
+ * Fetch all ingredients for a given recipe's Airtable record ID scoped to the given family.
+ * @param recipeId    Airtable record ID (e.g. "rec3UYmUC66UCFfoF")
+ * @param familyCode  Family identifier from the fm_family cookie (e.g. "K&E")
  */
-export async function getIngredients(recipeId: string): Promise<Ingredient[]> {
-  // Field name referenced via FIELDS const — not hardcoded in the formula string
+export async function getIngredients(recipeId: string, familyCode: string): Promise<Ingredient[]> {
+  // Field names referenced via FIELDS const — not hardcoded in formula strings
   const params = new URLSearchParams({
-    filterByFormula: `FIND("${recipeId}", ARRAYJOIN({${FIELDS.ingredient.recipeIds}}, ","))`,
+    filterByFormula: `AND({${FIELDS.ingredient.famille}}="${escapeFamilyCode(familyCode)}", FIND("${recipeId}", ARRAYJOIN({${FIELDS.ingredient.recipeIds}}, ",")))`,
   })
   const records = await airtableFetchAll('Ingrédients', params)
   return records.map(({ id, fields }) => mapIngredient(id, fields))
 }
 
 /**
- * Fetch ALL ingredients from the Ingrédients table (used for shopping list aggregation).
- * @returns Array of all ingredients in the system
+ * Fetch all ingredients for the given family (used for shopping list aggregation).
+ * @param familyCode  Family identifier from the fm_family cookie (e.g. "K&E")
  */
-export async function getAllIngredients(): Promise<Ingredient[]> {
-  const records = await airtableFetchAll('Ingrédients')
+export async function getAllIngredients(familyCode: string): Promise<Ingredient[]> {
+  const params = new URLSearchParams({
+    filterByFormula: `{${FIELDS.ingredient.famille}}="${escapeFamilyCode(familyCode)}"`,
+  })
+  const records = await airtableFetchAll('Ingrédients', params)
   return records.map(({ id, fields }) => mapIngredient(id, fields))
 }
 
@@ -404,7 +427,7 @@ export async function updatePlanningSlotNotes(
 const INDEX_TO_DAY_NAME = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'] as const
 
 /**
- * Create a new planning slot row in Airtable.
+ * Create a new planning slot row in Airtable scoped to the given family.
  * Used when dropping a recipe onto a cell that has no existing Airtable record.
  * @returns The new Airtable record ID
  */
@@ -413,6 +436,7 @@ export async function createPlanningSlot(
   dayIndex: number,
   mealType: string,
   recipeId: string,
+  familyCode: string,
 ): Promise<string> {
   const apiKey = process.env.AIRTABLE_API_KEY
   const baseId = process.env.AIRTABLE_BASE_ID
@@ -434,6 +458,7 @@ export async function createPlanningSlot(
         [FIELDS.planning.day]: INDEX_TO_DAY_NAME[dayIndex],
         [FIELDS.planning.slotType]: mealType,
         [FIELDS.planning.recipeIds]: [recipeId],
+        [FIELDS.planning.famille]: familyCode,
       },
     }),
   })
@@ -452,12 +477,13 @@ export async function createPlanningSlot(
 /**
  * Duplicates the previous week's recipe assignments onto the current week's slots.
  * Matches slots by (day, slotType). Does NOT copy omnivore annotations (notes).
- * @param fromWeek  ISO week string of the source week (e.g. "2026-W09")
- * @param toWeek    ISO week string of the destination week (e.g. "2026-W10")
- * @returns         Updated WeekPlan for toWeek with recipes copied from fromWeek
+ * @param fromWeek    ISO week string of the source week (e.g. "2026-W09")
+ * @param toWeek      ISO week string of the destination week (e.g. "2026-W10")
+ * @param familyCode  Family identifier — scopes both week reads to the correct family
+ * @returns           Updated WeekPlan for toWeek with recipes copied from fromWeek
  */
-export async function duplicateWeekPlan(fromWeek: string, toWeek: string): Promise<WeekPlan> {
-  const [fromPlan, toPlan] = await Promise.all([getWeekPlan(fromWeek), getWeekPlan(toWeek)])
+export async function duplicateWeekPlan(fromWeek: string, toWeek: string, familyCode: string): Promise<WeekPlan> {
+  const [fromPlan, toPlan] = await Promise.all([getWeekPlan(fromWeek, familyCode), getWeekPlan(toWeek, familyCode)])
 
   // Build lookup from previous week: key = "${day}-${slotType}"
   const fromSlotMap = new Map<string, MealSlot>()

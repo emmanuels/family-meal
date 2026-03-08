@@ -17,6 +17,8 @@ interface MealCellProps {
   onTap?: () => void
   /** Optional loading state to disable editing (AC10) */
   isLoading?: boolean
+  /** When true, all editing interactions are disabled (past week read-only mode) */
+  readOnly?: boolean
 }
 
 export const MealCell = React.memo(function MealCell({
@@ -26,6 +28,7 @@ export const MealCell = React.memo(function MealCell({
   variant,
   onTap,
   isLoading = false,
+  readOnly = false,
 }: MealCellProps) {
   const isEmpty = slot === null || slot.recipeId === null
   const [isEditingAnnotation, setIsEditingAnnotation] = useState(false)
@@ -94,6 +97,8 @@ export const MealCell = React.memo(function MealCell({
   }, [slot])
 
   const isDisabled = isLoading || isSaving
+  // In read-only mode: no tap, no annotation editing, no delete
+  const effectiveOnTap = readOnly ? undefined : onTap
 
   return (
     <div
@@ -101,14 +106,14 @@ export const MealCell = React.memo(function MealCell({
         'relative flex flex-col justify-between rounded px-3 py-2',
         variant === 'mobile' ? 'h-[84px]' : 'h-[76px]',
         isEmpty && 'border border-dashed border-warm',
-        isEmpty && onTap && 'cursor-pointer active:opacity-70',
+        isEmpty && effectiveOnTap && 'cursor-pointer active:opacity-70',
         !isEmpty && isVegetarian && 'bg-sage-light',
         !isEmpty && !isVegetarian && 'bg-cream border border-warm',
-        !isEmpty && onTap && 'cursor-pointer active:opacity-80',
+        !isEmpty && effectiveOnTap && 'cursor-pointer active:opacity-80',
         isDisabled && 'opacity-50',
       )}
-      onClick={onTap && !isEditingAnnotation ? onTap : undefined}
-      onMouseEnter={() => !isEmpty && setIsHovering(true)}
+      onClick={effectiveOnTap && !isEditingAnnotation ? effectiveOnTap : undefined}
+      onMouseEnter={() => !isEmpty && !readOnly && setIsHovering(true)}
       onMouseLeave={() => !isEmpty && setIsHovering(false)}
     >
       {/* Slot type label — shown on mobile only; desktop MealGrid provides row headers */}
@@ -150,33 +155,39 @@ export const MealCell = React.memo(function MealCell({
           {isVegetarian && !slot.notes && (
             <Badge
               variant="outline"
-              className="max-w-full rounded border-green-300 bg-green-50 px-1.5 py-0 text-xs text-green-700 cursor-pointer"
+              className={cn(
+                "max-w-full rounded border-green-300 bg-green-50 px-1.5 py-0 text-xs text-green-700",
+                !readOnly && "cursor-pointer",
+              )}
               onClick={(e) => {
                 e.stopPropagation()
-                if (!isDisabled) setIsEditingAnnotation(true)
+                if (!isDisabled && !readOnly) setIsEditingAnnotation(true)
               }}
             >
               Végétarien
             </Badge>
           )}
-          
+
           {/* Orange badge: has omnivore annotation */}
           {/* AC5: Annotation text is rendered as text (not HTML) - safe from XSS injection */}
           {slot.notes && (
             <Badge
               variant="outline"
-              className="max-w-full truncate rounded border-terracotta/30 bg-terracotta-light/20 px-1.5 py-0 text-xs text-terracotta cursor-pointer"
+              className={cn(
+                "max-w-full truncate rounded border-terracotta/30 bg-terracotta-light/20 px-1.5 py-0 text-xs text-terracotta",
+                !readOnly && "cursor-pointer",
+              )}
               onClick={(e) => {
                 e.stopPropagation()
-                if (!isDisabled) setIsEditingAnnotation(true)
+                if (!isDisabled && !readOnly) setIsEditingAnnotation(true)
               }}
             >
               {slot.notes}
             </Badge>
           )}
 
-          {/* × delete button — shows on hover (AC8) */}
-          {isHovering && !isDisabled && (
+          {/* × delete button — shows on hover, hidden in read-only mode (AC8) */}
+          {isHovering && !isDisabled && !readOnly && (
             <button
               onClick={(e) => {
                 e.stopPropagation()

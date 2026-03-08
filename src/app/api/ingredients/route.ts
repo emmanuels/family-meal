@@ -1,9 +1,16 @@
+import type { NextRequest } from 'next/server'
 import { ZodError } from 'zod'
 import { getAllIngredients, AirtableError } from '@/lib/airtable'
+import { getFamilyCodeFromRequest } from '@/lib/auth'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const familyCode = getFamilyCodeFromRequest(request)
+  if (!familyCode) {
+    return Response.json({ error: 'Authentication required', code: 401 }, { status: 401 })
+  }
+
   try {
-    const ingredients = await getAllIngredients()
+    const ingredients = await getAllIngredients(familyCode)
     return Response.json(ingredients)
   } catch (err) {
     if (err instanceof AirtableError) {

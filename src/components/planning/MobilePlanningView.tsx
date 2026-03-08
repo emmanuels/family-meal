@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/store/store'
+import { getCurrentWeekId, computeWeekDelta } from '@/lib/utils'
 import { WeekNav } from '@/components/planning/WeekNav'
 import { DaySwipeView } from '@/components/planning/DaySwipeView'
 import { ErrorBanner } from '@/components/planning/ErrorBanner'
@@ -23,6 +24,7 @@ export function MobilePlanningView() {
 
   const currentWeek = useAppStore((s) => s.currentWeek)
   const isLoadingPlan = useAppStore((s) => s.isLoadingPlan)
+  const isPastWeek = computeWeekDelta(currentWeek, getCurrentWeekId()) < 0
 
   useEffect(() => {
     let cancelled = false
@@ -74,7 +76,7 @@ export function MobilePlanningView() {
       ) : (
         <>
           <WeekNav />
-          <DaySwipeView />
+          <DaySwipeView readOnly={isPastWeek} />
         </>
       )}
     </>

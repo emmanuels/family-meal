@@ -7,6 +7,66 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * getCurrentWeekId — returns the ISO week string for the current calendar week.
+ * Format: "YYYY-WWW" (e.g. "2026-W10").
+ * Handles the early-January edge case where ISO week belongs to the previous year.
+ */
+export function getCurrentWeekId(): string {
+  const now = new Date()
+  const year = now.getUTCFullYear()
+
+  // Jan 4 is always in ISO week 1 (ISO 8601)
+  const jan4 = new Date(Date.UTC(year, 0, 4))
+  const dow = jan4.getUTCDay() === 0 ? 7 : jan4.getUTCDay() // Mon=1 … Sun=7
+
+  // Monday of week 1
+  const weekOneMon = new Date(jan4)
+  weekOneMon.setUTCDate(jan4.getUTCDate() - (dow - 1))
+
+  // Days since week 1 Monday (UTC)
+  const daysSinceWeekOne = Math.floor(
+    (Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) -
+      weekOneMon.getTime()) /
+      86_400_000,
+  )
+
+  const weekNum = Math.floor(daysSinceWeekOne / 7) + 1
+
+  // Edge case: early January may compute week < 1 → last week of previous year
+  if (weekNum < 1) {
+    const dec28Prev = new Date(Date.UTC(year - 1, 11, 28))
+    const jan4Prev = new Date(Date.UTC(year - 1, 0, 4))
+    const dowPrev = jan4Prev.getUTCDay() === 0 ? 7 : jan4Prev.getUTCDay()
+    const weekOneMonPrev = new Date(jan4Prev)
+    weekOneMonPrev.setUTCDate(jan4Prev.getUTCDate() - (dowPrev - 1))
+    const lastWeek =
+      Math.floor((dec28Prev.getTime() - weekOneMonPrev.getTime()) / 86_400_000 / 7) + 1
+    return `${year - 1}-W${String(lastWeek).padStart(2, '0')}`
+  }
+
+  return `${year}-W${String(weekNum).padStart(2, '0')}`
+}
+
+/**
+ * computeWeekDelta — signed distance in weeks between two ISO week strings.
+ * Positive = weekId is AHEAD of referenceWeekId (future)
+ * Negative = weekId is BEHIND referenceWeekId (past)
+ * Uses simplified 52-week model (consistent with getAdjacentWeek).
+ */
+export function computeWeekDelta(weekId: string, referenceWeekId: string): number {
+  const matchA = weekId.match(/^(\d{4})-W(\d{1,2})$/)
+  const matchB = referenceWeekId.match(/^(\d{4})-W(\d{1,2})$/)
+  if (!matchA || !matchB) return 0
+
+  const yearA = parseInt(matchA[1], 10)
+  const weekA = parseInt(matchA[2], 10)
+  const yearB = parseInt(matchB[1], 10)
+  const weekB = parseInt(matchB[2], 10)
+
+  return (yearA - yearB) * 52 + (weekA - weekB)
+}
+
+/**
  * Returns the weekId for the next or previous ISO week.
  * @param weekId ISO week string "YYYY-WWW" (e.g., "2026-W10")
  * @param delta  +1 for next week, -1 for previous week
@@ -28,6 +88,17 @@ export function getAdjacentWeek(weekId: string, delta: 1 | -1): string {
   }
 
   return `${year}-W${String(week).padStart(2, '0')}`
+}
+
+/**
+ * getDateStrFromWeekStart — returns ISO date "YYYY-MM-DD" for a given weekStart and dayIndex.
+ * dayIndex follows ISO convention: 0 = Monday … 6 = Sunday.
+ * Used by DaySwipeView and MealGrid to compute slot dates for PUT /api/planning.
+ */
+export function getDateStrFromWeekStart(weekStart: string, dayIndex: number): string {
+  const d = new Date(weekStart + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + dayIndex)
+  return d.toISOString().slice(0, 10)
 }
 
 // ─── Shopping List Constants (Story 4.1) ──────────────────────────────────────

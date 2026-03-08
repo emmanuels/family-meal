@@ -1,8 +1,14 @@
 import type { NextRequest } from 'next/server'
 import { z, ZodError } from 'zod'
 import { getWeekPlan, updatePlanningSlot, updatePlanningSlotNotes, duplicateWeekPlan, createPlanningSlot, AirtableError } from '@/lib/airtable'
+import { getFamilyCodeFromRequest } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
+  const familyCode = getFamilyCodeFromRequest(request)
+  if (!familyCode) {
+    return Response.json({ error: 'Authentication required', code: 401 }, { status: 401 })
+  }
+
   const week = request.nextUrl.searchParams.get('week')
 
   if (!week) {
@@ -13,7 +19,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const weekPlan = await getWeekPlan(week)
+    const weekPlan = await getWeekPlan(week, familyCode)
     return Response.json(weekPlan)
   } catch (err) {
     if (err instanceof AirtableError) {
@@ -49,6 +55,11 @@ const PostBodySchema = z.object({
 })
 
 export async function POST(request: NextRequest) {
+  const familyCode = getFamilyCodeFromRequest(request)
+  if (!familyCode) {
+    return Response.json({ error: 'Authentication required', code: 401 }, { status: 401 })
+  }
+
   let body: unknown
   try {
     body = await request.json()
@@ -58,7 +69,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const { fromWeek, toWeek } = PostBodySchema.parse(body)
-    const weekPlan = await duplicateWeekPlan(fromWeek, toWeek)
+    const weekPlan = await duplicateWeekPlan(fromWeek, toWeek, familyCode)
     return Response.json(weekPlan)
   } catch (err) {
     if (err instanceof AirtableError) {
@@ -78,6 +89,15 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const familyCode = getFamilyCodeFromRequest(request)
+  if (!familyCode) {
+    return Response.json({ error: 'Authentication required', code: 401 }, { status: 401 })
+  }
+  // Note: updatePlanningSlot/updatePlanningSlotNotes operate by Airtable record ID.
+  // Ownership verification (confirming the slot's Famille matches familyCode before
+  // patching) is an accepted risk for V1 — slot IDs are opaque and not user-discoverable.
+  // If multi-family becomes adversarial, add a GET + Famille check before patching.
+
   let body: unknown
   try {
     body = await request.json()
@@ -123,6 +143,11 @@ const PutBodySchema = z.object({
 })
 
 export async function PUT(request: NextRequest) {
+  const familyCode = getFamilyCodeFromRequest(request)
+  if (!familyCode) {
+    return Response.json({ error: 'Authentication required', code: 401 }, { status: 401 })
+  }
+
   let body: unknown
   try {
     body = await request.json()
@@ -132,7 +157,7 @@ export async function PUT(request: NextRequest) {
 
   try {
     const { date, dayIndex, mealType, recipeId } = PutBodySchema.parse(body)
-    const id = await createPlanningSlot(date, dayIndex, mealType, recipeId)
+    const id = await createPlanningSlot(date, dayIndex, mealType, recipeId, familyCode)
     return Response.json({ id })
   } catch (err) {
     if (err instanceof AirtableError) {

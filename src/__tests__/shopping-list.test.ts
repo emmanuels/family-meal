@@ -150,8 +150,8 @@ describe('Shopping List Aggregation', () => {
     it('should aggregate ingredients from all filled slots', () => {
       const result = aggregateShoppingList(mockRecipes, mockWeekPlan, mockIngredients)
 
-      // Should have 5 unique ingredient items
-      expect(result.length).toBe(5)
+      // Should have 4 consolidated items: Tomates, Œufs (4+2=6 pièce), Pâtes, Lardons
+      expect(result.length).toBe(4)
       expect(result.some((item) => item.name === 'Œufs')).toBe(true)
       expect(result.some((item) => item.name === 'Pâtes')).toBe(true)
     })

@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 import { z, ZodError } from 'zod'
 import { getWeekPlan, getRecipes, getAllIngredients, AirtableError } from '@/lib/airtable'
 import { aggregateShoppingList } from '@/lib/utils'
+import { getFamilyCodeFromRequest } from '@/lib/auth'
 
 /**
  * GET /api/shopping-list?week=YYYY-WWW
@@ -26,6 +27,11 @@ const SearchParamsSchema = z.object({
 })
 
 export async function GET(request: NextRequest): Promise<Response> {
+  const familyCode = getFamilyCodeFromRequest(request)
+  if (!familyCode) {
+    return Response.json({ error: 'Authentication required', code: 401 }, { status: 401 })
+  }
+
   try {
     const { week } = SearchParamsSchema.parse({
       week: request.nextUrl.searchParams.get('week'),
@@ -33,9 +39,9 @@ export async function GET(request: NextRequest): Promise<Response> {
 
     // Fetch week plan and recipes in parallel for better performance
     const [weekPlan, recipes, ingredients] = await Promise.all([
-      getWeekPlan(week),
-      getRecipes(),
-      getAllIngredients(),
+      getWeekPlan(week, familyCode),
+      getRecipes(familyCode),
+      getAllIngredients(familyCode),
     ])
 
     // Aggregate ingredients from all recipes in the week plan

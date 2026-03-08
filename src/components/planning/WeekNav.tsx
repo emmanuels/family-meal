@@ -2,7 +2,12 @@
 
 import { Printer } from 'lucide-react'
 import { useAppStore } from '@/store/store'
-import { getAdjacentWeek } from '@/lib/utils'
+import { getAdjacentWeek, getCurrentWeekId, computeWeekDelta } from '@/lib/utils'
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+/** Maximum number of weeks ahead of today that can be navigated to. */
+const MAX_FUTURE_WEEKS = 8
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,34 +37,6 @@ function getWeekLabel(weekId: string): string {
   )
 }
 
-// Computed once at module load — today's ISO weekId for "dim forward" comparison
-const TODAY_WEEK_ID = (() => {
-  const now = new Date()
-  const year = now.getUTCFullYear()
-  const jan4 = new Date(Date.UTC(year, 0, 4))
-  const dow = jan4.getUTCDay() === 0 ? 7 : jan4.getUTCDay()
-  const weekOneMon = new Date(jan4)
-  weekOneMon.setUTCDate(jan4.getUTCDate() - (dow - 1))
-  const days = Math.floor(
-    (Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) -
-      weekOneMon.getTime()) /
-      86_400_000,
-  )
-  const weekNum = Math.floor(days / 7) + 1
-  // Use Dec 28 (always in the last ISO week of any year) to handle W52 vs W53 correctly
-  if (weekNum < 1) {
-    const dec28Prev = new Date(Date.UTC(year - 1, 11, 28))
-    const jan4Prev = new Date(Date.UTC(year - 1, 0, 4))
-    const dowPrev = jan4Prev.getUTCDay() === 0 ? 7 : jan4Prev.getUTCDay()
-    const weekOneMonPrev = new Date(jan4Prev)
-    weekOneMonPrev.setUTCDate(jan4Prev.getUTCDate() - (dowPrev - 1))
-    const lastWeek =
-      Math.floor((dec28Prev.getTime() - weekOneMonPrev.getTime()) / 86_400_000 / 7) + 1
-    return `${year - 1}-W${String(lastWeek).padStart(2, '0')}`
-  }
-  return `${year}-W${String(weekNum).padStart(2, '0')}`
-})()
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function WeekNav() {
@@ -67,7 +44,9 @@ export function WeekNav() {
   // Use getState() for stable action reference — actions never change, selector subscription is wasteful
   const { setCurrentWeek } = useAppStore.getState()
 
-  const isCurrentWeek = currentWeek === TODAY_WEEK_ID
+  const weekDelta = computeWeekDelta(currentWeek, getCurrentWeekId())
+  const isPastWeek = weekDelta < 0
+  const isAtFutureLimit = weekDelta >= MAX_FUTURE_WEEKS
 
   return (
     <div className="flex items-center justify-between border-b border-warm/40 px-4 py-3">
@@ -79,13 +58,18 @@ export function WeekNav() {
         ‹
       </button>
 
-      <p className="text-sm font-medium text-charcoal">{getWeekLabel(currentWeek)}</p>
+      <p className="flex items-center gap-1.5 text-sm font-medium text-charcoal">
+        {getWeekLabel(currentWeek)}
+        {isPastWeek && (
+          <span className="text-xs font-normal text-charcoal/40" aria-label="semaine passée, lecture seule">(passée)</span>
+        )}
+      </p>
 
       <div className="flex items-center gap-1">
         <button
           onClick={() => setCurrentWeek(getAdjacentWeek(currentWeek, 1))}
           aria-label="Semaine suivante"
-          disabled={isCurrentWeek}
+          disabled={isAtFutureLimit}
           className="p-1 text-lg text-charcoal/60 disabled:opacity-30"
         >
           ›

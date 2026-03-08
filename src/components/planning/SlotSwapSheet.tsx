@@ -11,32 +11,37 @@ import {
 } from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import type { MealSlot } from '@/types/index'
+import type { DayIndex, MealSlot, MealType } from '@/types/index'
 
 interface SlotSwapSheetProps {
-  slot: MealSlot
+  /** null = creation mode (no Airtable record exists yet for this cell) */
+  slot: MealSlot | null
+  /** Meal type for category filter — always required (replaces slot.slotType when slot is null) */
+  slotType: MealType
+  /** Required when slot === null: provides date/dayIndex for PUT /api/planning */
+  slotContext?: { date: string; day: DayIndex }
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-export function SlotSwapSheet({ slot, open, onOpenChange }: SlotSwapSheetProps) {
+export function SlotSwapSheet({ slot, slotType, slotContext, open, onOpenChange }: SlotSwapSheetProps) {
   const recipes = useAppStore((s) => s.recipes)
   const weekPlan = useAppStore((s) => s.weekPlan)
 
-  // Collect recipeIds already used this week, excluding the slot being replaced
+  // Collect recipeIds already used this week, excluding the slot being replaced (null-safe)
   const usedRecipeIds = new Set(
     weekPlan?.slots
-      .filter((s) => s.id !== slot.id && s.recipeId !== null)
+      .filter((s) => s.id !== slot?.id && s.recipeId !== null)
       .map((s) => s.recipeId as string) ?? [],
   )
 
-  // Smart suggestions: same category as slot + not already used this week, max 5
+  // Smart suggestions: same category as slotType + not already used this week, max 5
   const suggestions = recipes
-    .filter((r) => r.category === slot.slotType && !usedRecipeIds.has(r.id))
+    .filter((r) => r.category === slotType && !usedRecipeIds.has(r.id))
     .slice(0, 5)
 
-  const [annotation, setAnnotation] = useState(slot.notes ?? '')
-  const annotationRef = useRef(slot.notes ?? '')
+  const [annotation, setAnnotation] = useState(slot?.notes ?? '')
+  const annotationRef = useRef(slot?.notes ?? '')
 
   const [query, setQuery] = useState('')
 
@@ -45,12 +50,15 @@ export function SlotSwapSheet({ slot, open, onOpenChange }: SlotSwapSheetProps) 
   const displayList = query.trim()
     ? recipes.filter(
         (r) =>
-          r.category === slot.slotType &&
+          r.category === slotType &&
           r.name.toLowerCase().includes(query.trim().toLowerCase()),
       )
     : suggestions
 
   async function handleAnnotationBlur() {
+    // Annotation is only for edit mode (existing slot)
+    if (!slot) return
+
     const trimmed = annotation.trim()
     const normalised = trimmed || null
 
@@ -80,6 +88,45 @@ export function SlotSwapSheet({ slot, open, onOpenChange }: SlotSwapSheetProps) 
   }
 
   async function handleSelect(recipe: (typeof recipes)[number]) {
+    if (!slot) {
+      // ── Creation mode: PUT to create new Airtable slot ──
+      if (!slotContext) return
+      const { weekPlan: currentWeekPlan, setWeekPlan } = useAppStore.getState()
+      if (!currentWeekPlan) return
+
+      onOpenChange(false)
+
+      try {
+        const res = await fetch('/api/planning', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: slotContext.date,
+            dayIndex: slotContext.day,
+            mealType: slotType,
+            recipeId: recipe.id,
+          }),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const { id } = await res.json() as { id: string }
+        const newSlot: MealSlot = {
+          id,
+          date: slotContext.date,
+          day: slotContext.day,
+          slotType,
+          recipeId: recipe.id,
+          recipeName: recipe.name,
+          notes: null,
+        }
+        setWeekPlan({ ...currentWeekPlan, slots: [...currentWeekPlan.slots, newSlot] })
+        toast.success('Repas ajouté')
+      } catch {
+        toast.error('Impossible de créer le repas. Réessayez.')
+      }
+      return
+    }
+
+    // ── Edit mode: PATCH existing slot ──
     const { updateSlot, weekPlan: currentWeekPlan } = useAppStore.getState()
 
     // 1. Capture rollback values before any mutation
@@ -112,26 +159,30 @@ export function SlotSwapSheet({ slot, open, onOpenChange }: SlotSwapSheetProps) 
       <SheetContent side="bottom" className="rounded-t-xl px-4 pb-8 pt-4">
         <SheetHeader className="mb-3 p-0">
           <SheetTitle className="text-base font-semibold text-charcoal">
-            Changer {slot.slotType}
+            {slot ? `Changer ${slotType}` : `Ajouter ${slotType}`}
           </SheetTitle>
         </SheetHeader>
 
-        {/* Omnivore annotation section */}
-        <label
-          htmlFor="annotation-input"
-          className="mb-1 block text-xs font-medium text-charcoal/60"
-        >
-          Variante omnivore
-        </label>
-        <Input
-          id="annotation-input"
-          placeholder="ex: + lardons ×1"
-          value={annotation}
-          onChange={(e) => setAnnotation(e.target.value)}
-          onBlur={handleAnnotationBlur}
-          className="mb-4"
-          autoComplete="off"
-        />
+        {/* Omnivore annotation section — only in edit mode (not creation) */}
+        {slot && (
+          <>
+            <label
+              htmlFor="annotation-input"
+              className="mb-1 block text-xs font-medium text-charcoal/60"
+            >
+              Variante omnivore
+            </label>
+            <Input
+              id="annotation-input"
+              placeholder="ex: + lardons ×1"
+              value={annotation}
+              onChange={(e) => setAnnotation(e.target.value)}
+              onBlur={handleAnnotationBlur}
+              className="mb-4"
+              autoComplete="off"
+            />
+          </>
+        )}
 
         <Input
           placeholder="Rechercher une recette…"
