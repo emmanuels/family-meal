@@ -97,8 +97,7 @@ export function useCopyShoppingList() {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const data = (await response.json()) as { shoppingList: ShoppingItem[] }
-      const items = data.shoppingList || []
+      const items = (await response.json()) as ShoppingItem[]
 
       // Check for empty shopping list
       if (items.length === 0) {

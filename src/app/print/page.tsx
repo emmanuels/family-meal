@@ -108,9 +108,7 @@ function PrintPageContent() {
 
   // Function to render a meal cell
   const renderMealCell = (slot: MealSlot) => {
-    const recipe = getRecipe(slot.recipeId)
-
-    if (!recipe) {
+    if (!slot.recipeName) {
       return (
         <div className="print-cell print-cell-empty">
           <span className="print-empty-indicator">—</span>
@@ -118,11 +116,13 @@ function PrintPageContent() {
       )
     }
 
+    const recipe = getRecipe(slot.recipeId)
+
     return (
       <div className="print-cell">
         <div className="print-recipe-name">
-          {recipe.name}
-          {recipe.isVegetarian && <span className="print-veggie-indicator">(V)</span>}
+          {slot.recipeName}
+          {recipe?.isVegetarian && <span className="print-veggie-indicator">(V)</span>}
         </div>
         {slot.notes && <div className="print-annotation">{slot.notes}</div>}
       </div>
