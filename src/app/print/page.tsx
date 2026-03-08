@@ -64,32 +64,30 @@ function PrintPageContent() {
   const recipes = useAppStore((state) => state.recipes)
 
   const [weekPlan, setWeekPlan] = useState(weekPlanStore)
-  const [isLoading, setIsLoading] = useState(!weekPlanStore)
+  const [localRecipes, setLocalRecipes] = useState<Recipe[]>(recipes)
+  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const weekParam = searchParams?.get('week') || currentWeekStore
 
   useEffect(() => {
-    // If we already have the week plan in store and it matches the requested week, use it
-    if (weekPlanStore && weekPlanStore.weekId === weekParam) {
-      setWeekPlan(weekPlanStore)
-      setIsLoading(false)
-      return
-    }
-
-    // Otherwise, fetch the week plan from API
-    const fetchWeekPlan = async () => {
+    // Always fetch both — store may be empty when opened in a new tab
+    const fetchData = async () => {
       try {
         setIsLoading(true)
         setError(null)
 
-        const response = await fetch(`/api/planning?week=${weekParam}`)
-        if (!response.ok) {
-          throw new Error(`Failed to load week plan: ${response.statusText}`)
-        }
+        const [planRes, recipesRes] = await Promise.all([
+          fetch(`/api/planning?week=${weekParam}`),
+          fetch('/api/recipes'),
+        ])
 
-        const data = await response.json()
-        setWeekPlan(data)
+        if (!planRes.ok) throw new Error(`Failed to load week plan: ${planRes.statusText}`)
+        if (!recipesRes.ok) throw new Error(`Failed to load recipes: ${recipesRes.statusText}`)
+
+        const [planData, recipesData] = await Promise.all([planRes.json(), recipesRes.json()])
+        setWeekPlan(planData)
+        setLocalRecipes(recipesData)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
@@ -97,18 +95,21 @@ function PrintPageContent() {
       }
     }
 
-    fetchWeekPlan()
-  }, [weekParam, weekPlanStore])
+    fetchData()
+  }, [weekParam])
 
-  // Function to get recipe by ID
+  // Function to get recipe by ID — uses locally fetched recipes, not Zustand store
   const getRecipe = (recipeId: string | null): Recipe | null => {
     if (!recipeId) return null
-    return recipes.find((r) => r.id === recipeId) || null
+    return localRecipes.find((r) => r.id === recipeId) || null
   }
 
   // Function to render a meal cell
   const renderMealCell = (slot: MealSlot) => {
-    if (!slot.recipeName) {
+    const recipe = getRecipe(slot.recipeId)
+    const displayName = recipe?.name ?? slot.recipeName
+
+    if (!displayName) {
       return (
         <div className="print-cell print-cell-empty">
           <span className="print-empty-indicator">—</span>
@@ -116,12 +117,10 @@ function PrintPageContent() {
       )
     }
 
-    const recipe = getRecipe(slot.recipeId)
-
     return (
       <div className="print-cell">
         <div className="print-recipe-name">
-          {slot.recipeName}
+          {displayName}
           {recipe?.isVegetarian && <span className="print-veggie-indicator">(V)</span>}
         </div>
         {slot.notes && <div className="print-annotation">{slot.notes}</div>}
