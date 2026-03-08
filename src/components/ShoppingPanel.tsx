@@ -23,6 +23,7 @@ import { useAppStore } from '@/store/store'
  */
 export function ShoppingPanel({ className }: { className?: string }) {
   const items = useShoppingList()
+  const hasWeekPlan = useAppStore((state) => !!state.weekPlan)
 
   return (
     <div className={className}>
@@ -33,9 +34,7 @@ export function ShoppingPanel({ className }: { className?: string }) {
       {items.length === 0 ? (
         <div className="rounded bg-warm/20 p-3 text-center">
           <p className="text-xs text-charcoal/60">
-            {!useAppStore((state) => state.weekPlan)
-              ? 'Chargement…'
-              : 'Aucun repas planifié'}
+            {!hasWeekPlan ? 'Chargement…' : 'Aucun repas planifié'}
           </p>
         </div>
       ) : (
