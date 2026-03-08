@@ -145,14 +145,17 @@ export function DaySwipeView() {
         {daySlots.map(({ mealType, slot }) => {
           const recipe = slot?.recipeId ? recipes.find((r) => r.id === slot.recipeId) : undefined
           const isVegetarian = recipe?.isVegetarian ?? false
+          const displaySlot = slot && recipe && !slot.recipeName
+            ? { ...slot, recipeName: recipe.name }
+            : slot
           return (
             <MealCell
               key={mealType}
-              slot={slot}
+              slot={displaySlot}
               slotType={mealType}
               isVegetarian={isVegetarian}
               variant="mobile"
-              onTap={slot ? () => { setTappedSlot(slot); setSheetOpen(true) } : undefined}
+              onTap={displaySlot ? () => { setTappedSlot(displaySlot); setSheetOpen(true) } : undefined}
             />
           )
         })}

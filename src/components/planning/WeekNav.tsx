@@ -81,22 +81,24 @@ export function WeekNav() {
 
       <p className="text-sm font-medium text-charcoal">{getWeekLabel(currentWeek)}</p>
 
-      <button
-        onClick={() => setCurrentWeek(getAdjacentWeek(currentWeek, 1))}
-        aria-label="Semaine suivante"
-        disabled={isCurrentWeek}
-        className="p-1 text-lg text-charcoal/60 disabled:opacity-30"
-      >
-        ›
-      </button>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => setCurrentWeek(getAdjacentWeek(currentWeek, 1))}
+          aria-label="Semaine suivante"
+          disabled={isCurrentWeek}
+          className="p-1 text-lg text-charcoal/60 disabled:opacity-30"
+        >
+          ›
+        </button>
 
-      <button
-        onClick={() => window.open(`/print?week=${currentWeek}`, '_blank', 'noopener,noreferrer')}
-        aria-label="Imprimer le calendrier"
-        className="p-1 text-charcoal/60 hover:text-charcoal"
-      >
-        <Printer size={16} />
-      </button>
+        <button
+          onClick={() => window.open(`/print?week=${currentWeek}`, '_blank', 'noopener,noreferrer')}
+          aria-label="Imprimer le calendrier"
+          className="p-1 text-charcoal/60 hover:text-charcoal"
+        >
+          <Printer size={16} />
+        </button>
+      </div>
     </div>
   )
 }

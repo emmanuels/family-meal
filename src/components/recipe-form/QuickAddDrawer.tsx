@@ -9,14 +9,14 @@ export function QuickAddDrawer() {
   const toggleQuickAdd = useAppStore((s) => s.toggleQuickAdd)
 
   return (
-    <Sheet open={quickAddOpen} onOpenChange={(open) => { if (!open) toggleQuickAdd() }}>
+    <Sheet open={quickAddOpen} onOpenChange={(open) => { if (!open && useAppStore.getState().quickAddOpen) toggleQuickAdd() }}>
       <SheetContent side="right" className="w-[480px] sm:max-w-[480px] overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Nouvelle recette</SheetTitle>
           <SheetDescription className="sr-only">Formulaire de création de recette</SheetDescription>
         </SheetHeader>
         <div className="mt-4">
-          <RecipeForm onCancel={toggleQuickAdd} onSuccess={() => { if (quickAddOpen) toggleQuickAdd() }} />
+          <RecipeForm onCancel={toggleQuickAdd} onSuccess={() => { if (useAppStore.getState().quickAddOpen) toggleQuickAdd() }} />
         </div>
       </SheetContent>
     </Sheet>

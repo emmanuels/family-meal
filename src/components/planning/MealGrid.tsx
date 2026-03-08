@@ -107,30 +107,34 @@ export function MealGrid() {
               const recipe = slot?.recipeId
                 ? recipes.find((r) => r.id === slot.recipeId)
                 : undefined
-              const hasRecipe = slot && slot.recipeId
+              // Fallback: si Airtable n'a pas renvoyé recipeName, on le lit depuis le store recipes
+              const displaySlot = slot && recipe && !slot.recipeName
+                ? { ...slot, recipeName: recipe.name }
+                : slot
+              const hasRecipe = displaySlot && displaySlot.recipeId
               return (
                 <DroppableCell
                   key={dayIndex}
                   id={`cell-${dayIndex}-${mealType}`}
-                  slot={slot}
+                  slot={displaySlot}
                   mealType={mealType}
                   dayIndex={dayIndex}
                 >
-                  {hasRecipe && slot ? (
+                  {hasRecipe && displaySlot ? (
                     <DraggableMealCell
-                      slot={slot}
+                      slot={displaySlot}
                       slotType={mealType}
                       isVegetarian={recipe?.isVegetarian ?? false}
                       variant="desktop"
-                      onTap={() => { setTappedSlot(slot); setSheetOpen(true) }}
+                      onTap={() => { setTappedSlot(displaySlot); setSheetOpen(true) }}
                     />
                   ) : (
                     <MealCell
-                      slot={slot}
+                      slot={displaySlot}
                       slotType={mealType}
                       isVegetarian={recipe?.isVegetarian ?? false}
                       variant="desktop"
-                      onTap={slot ? () => { setTappedSlot(slot); setSheetOpen(true) } : undefined}
+                      onTap={displaySlot ? () => { setTappedSlot(displaySlot); setSheetOpen(true) } : undefined}
                     />
                   )}
                 </DroppableCell>
