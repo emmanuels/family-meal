@@ -69,18 +69,18 @@
   border: 1px solid #ddd;
   padding: 0;
   height: auto;
-  min-height: 80px;
+  min-height: 120px;
 }
 
 .print-cell-wrapper {
   padding: 0;
-  height: 100px;
-  vertical-align: top;
+  height: 140px;
+  vertical-align: middle;
   background-color: white;
 }
 
 .print-cell {
-  padding: 0.5rem;
+  padding: 0.75rem;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -90,7 +90,7 @@
 }
 
 .print-cell-empty {
-  padding: 0.5rem;
+  padding: 0.75rem;
   height: 100%;
   background-color: #fafafa;
   border-right: 1px dashed #ddd;
@@ -246,33 +246,33 @@
   .print-calendar td {
     border: 0.5pt solid #000;
     padding: 0;
-    height: auto;
+    height: 3.2cm;
   }
 
   .print-cell-wrapper {
     padding: 0;
-    width: 2.4cm;
-    height: 1.5cm;
-    vertical-align: top;
+    height: 3.2cm;
+    vertical-align: middle;
     overflow: hidden;
   }
 
   .print-cell {
-    padding: 0.1cm;
-    height: 1.5cm;
+    padding: 0.25cm 0.3cm;
+    height: 3.2cm;
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;
+    justify-content: center;
     word-wrap: break-word;
     word-break: break-word;
     overflow: hidden;
-    font-size: 8pt;
-    line-height: 1.1;
+    font-size: 9pt;
+    line-height: 1.3;
+    box-sizing: border-box;
   }
 
   .print-cell-empty {
     padding: 0;
-    height: 1.5cm;
+    height: 3.2cm;
     background-color: white;
     border-right: 0.5pt solid #999;
     display: flex;
@@ -288,26 +288,26 @@
 
   .print-recipe-name {
     font-family: 'Playfair Display', serif;
-    font-size: 10pt;
-    line-height: 1.1;
+    font-size: 11pt;
+    line-height: 1.3;
     font-weight: bold;
     color: #000;
-    margin-bottom: 0;
+    margin-bottom: 0.1cm;
   }
 
   .print-veggie-indicator {
-    font-size: 8pt;
+    font-size: 9pt;
     font-weight: normal;
     margin-left: 0.1cm;
     color: #000;
   }
 
   .print-annotation {
-    font-size: 7pt;
-    line-height: 1;
-    color: #000;
+    font-size: 8pt;
+    line-height: 1.2;
+    color: #444;
     font-style: italic;
-    margin-top: 0.05cm;
+    margin-top: 0.1cm;
   }
 
   .print-footer {
