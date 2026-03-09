@@ -79,12 +79,6 @@ export function DesktopPlanningView() {
     const { updateSlot, weekPlan } = useAppStore.getState()
     if (!weekPlan) return
 
-    // Cross-week drag validation (AC1)
-    if (targetSlot && slot.date !== targetSlot.date) {
-      toast.error('Impossible de déplacer entre semaines')
-      return
-    }
-
     // Save previous state for rollback
     const sourceSlotPrev = weekPlan.slots.find((s) => s.id === slot.id)
     const targetSlotPrev = targetSlot ? weekPlan.slots.find((s) => s.id === targetSlot.id) : null
