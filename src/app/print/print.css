@@ -1,82 +1,147 @@
 /**
- * Print CSS for Story 5.1: A4 Print Layout — Current Week Calendar
- * 
- * Completely isolated from screen layout CSS.
- * Only applies within @media print context.
+ * Print CSS — Template "Menu de la semaine"
+ * Inspiré du template A4 paysage avec fond quadrillé vert, décorations légumes
  */
 
-/* Screen layout — all normal styles */
+@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&family=Playfair+Display:wght@400;700&display=swap');
+
+/* ─── Design tokens ─────────────────────────────────────────────────────────── */
+
+:root {
+  --green-dark: #3d7a54;
+  --green-light: #ebf5ef;
+  --green-grid: #c8dece;
+  --cell-bg: #ffffff;
+}
+
+/* ─── Screen layout ─────────────────────────────────────────────────────────── */
+
 .print-page {
-  /* Screen layout: normal page with nav and all chrome */
   display: block;
   width: 100%;
-  max-width: 100%;
-  margin: 0;
-  padding: 0;
-  background-color: white;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem;
+  background-color: var(--green-light);
+  background-image:
+    linear-gradient(var(--green-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--green-grid) 1px, transparent 1px);
+  background-size: 24px 24px;
   color: #2d2d2d;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
 }
+
+/* ─── Header ────────────────────────────────────────────────────────────────── */
 
 .print-header {
-  text-align: center;
-  margin-bottom: 1.5rem;
-  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem 0.75rem;
 }
 
-.print-header h1 {
-  font-family: 'Playfair Display', serif;
-  font-size: 28px;
-  margin: 0;
-  color: #2d2d2d;
+.print-header-decos {
+  font-size: 30px;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 1;
 }
+
+.print-decos-right {
+  justify-content: flex-end;
+}
+
+.print-header-center {
+  text-align: center;
+  flex: 2;
+}
+
+.print-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 30px;
+  font-weight: 700;
+  color: #2d2d2d;
+  margin: 0 0 0.2rem;
+  line-height: 1.2;
+}
+
+.print-subtitle {
+  font-family: 'Dancing Script', cursive;
+  font-size: 22px;
+  color: var(--green-dark);
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* ─── Table ─────────────────────────────────────────────────────────────────── */
 
 .print-calendar {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 1rem;
+  margin: 0.5rem 0;
 }
 
-.print-calendar thead {
-  background-color: #f0f0f0;
-}
-
-.print-calendar th {
-  border: 1px solid #ccc;
-  padding: 0.75rem;
+.print-calendar thead th {
+  background-color: var(--green-dark);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.3rem;
+  border: 2px solid var(--green-dark);
   text-align: center;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.print-day-header {
-  width: 12.5%; /* 7 columns = ~14.3% each, but account for category column */
 }
 
 .print-category-header {
-  width: 18%;
+  background-color: transparent !important;
+  border: none !important;
+  width: 2.5rem;
 }
+
+/* ─── Row labels (vertical text) ───────────────────────────────────────────── */
 
 .print-category-label {
-  text-align: left;
-  font-size: 13px;
-  background-color: #f9f9f9;
-  padding: 0.5rem;
-  border: 1px solid #ddd;
+  background-color: var(--green-dark);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 0;
+  border: 2px solid var(--green-dark);
+  width: 2.5rem;
+  vertical-align: middle;
 }
 
+.print-category-label span {
+  display: block;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  padding: 0.6rem 0.4rem;
+}
+
+/* ─── Cells ─────────────────────────────────────────────────────────────────── */
+
 .print-calendar td {
-  border: 1px solid #ddd;
+  border: 1px solid var(--green-grid);
   padding: 0;
   height: auto;
-  min-height: 120px;
+  min-height: 130px;
+  background-color: var(--cell-bg);
+  vertical-align: middle;
 }
 
 .print-cell-wrapper {
   padding: 0;
-  height: 140px;
+  height: 145px;
   vertical-align: middle;
-  background-color: white;
+  background-color: var(--cell-bg);
 }
 
 .print-cell {
@@ -87,13 +152,13 @@
   justify-content: center;
   word-wrap: break-word;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .print-cell-empty {
   padding: 0.75rem;
   height: 100%;
-  background-color: #fafafa;
-  border-right: 1px dashed #ddd;
+  background-color: var(--cell-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -101,14 +166,14 @@
 }
 
 .print-empty-indicator {
-  font-size: 20px;
+  font-size: 18px;
   color: #ddd;
   font-weight: 300;
 }
 
 .print-recipe-name {
   font-family: 'Playfair Display', serif;
-  font-size: 18px;
+  font-size: 14px;
   line-height: 1.3;
   font-weight: 600;
   color: #2d2d2d;
@@ -116,27 +181,29 @@
 }
 
 .print-veggie-indicator {
-  font-size: 16px;
+  font-size: 12px;
   font-weight: normal;
   margin-left: 0.25rem;
   color: #4caf50;
 }
 
 .print-annotation {
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.2;
   color: #666;
   font-style: italic;
-  margin-top: 0.25rem;
+  margin-top: 0.2rem;
 }
+
+/* ─── Footer ────────────────────────────────────────────────────────────────── */
 
 .print-footer {
   text-align: center;
   font-size: 11px;
   color: #999;
-  margin-top: 1rem;
+  margin-top: 0.75rem;
   padding-top: 0.5rem;
-  border-top: 1px solid #ddd;
+  border-top: 1px solid var(--green-grid);
 }
 
 .print-loading,
@@ -147,18 +214,16 @@
 }
 
 /* ─────────────────────────────────────────────────────────────── */
-/* PRINT LAYOUT — Only applies within @media print */
+/* PRINT LAYOUT — @media print                                    */
 /* ─────────────────────────────────────────────────────────────── */
 
 @media print {
-  /* Reset everything for print */
   * {
     margin: 0;
     padding: 0;
     border: 0;
   }
 
-  /* Page setup — A4 landscape */
   @page {
     size: A4 landscape;
     margin: 0.5cm;
@@ -170,163 +235,164 @@
     height: 100%;
     margin: 0;
     padding: 0;
-    background-color: white;
-    color: #2d2d2d;
   }
 
   .print-page {
     width: 100%;
-    display: block;
+    padding: 0.3cm;
+    background-color: #ebf5ef;
+    background-image:
+      linear-gradient(#c8dece 1px, transparent 1px),
+      linear-gradient(90deg, #c8dece 1px, transparent 1px);
+    background-size: 0.8cm 0.8cm;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
     page-break-after: avoid;
-    margin: 0;
-    padding: 0;
-    background-color: white;
-    color: #000; /* Black for print */
   }
+
+  /* Header */
 
   .print-header {
-    margin-bottom: 0.5cm;
-    padding: 0.25cm 0;
-    text-align: center;
-    page-break-after: avoid;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.2cm 0.4cm 0.2cm;
   }
 
-  .print-header h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: 24pt;
-    margin: 0;
-    color: #000;
-    line-height: 1.2;
+  .print-header-decos {
+    font-size: 18pt;
+    gap: 0.1cm;
+    flex: 1;
   }
+
+  .print-decos-right {
+    justify-content: flex-end;
+  }
+
+  .print-header-center {
+    text-align: center;
+    flex: 2;
+  }
+
+  .print-title {
+    font-size: 20pt;
+    margin-bottom: 0.05cm;
+    color: #2d2d2d;
+  }
+
+  .print-subtitle {
+    font-size: 15pt;
+    color: #3d7a54;
+  }
+
+  /* Table */
 
   .print-calendar {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 0;
-    font-size: 10pt;
+    margin: 0;
+    font-size: 8pt;
     line-height: 1.3;
   }
 
-  /* Table structure */
-  .print-calendar thead {
-    background-color: transparent;
-    page-break-after: avoid;
-  }
-
-  .print-calendar th {
-    border: 0.5pt solid #000;
-    padding: 0.2cm;
-    text-align: center;
-    font-weight: bold;
-    font-size: 10pt;
-    background-color: #f5f5f5;
-    color: #000;
-  }
-
-  .print-day-header {
-    font-size: 9pt;
-    padding: 0.15cm;
+  .print-calendar thead th {
+    background-color: #3d7a54 !important;
+    color: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    padding: 0.15cm 0.1cm;
+    border: 0.5pt solid #3d7a54 !important;
+    font-size: 8pt;
   }
 
   .print-category-header {
-    width: 3cm;
-    font-size: 8pt;
+    background-color: transparent !important;
+    border: none !important;
+    width: 1cm;
   }
 
   .print-category-label {
-    text-align: left;
-    font-size: 8pt;
-    font-weight: bold;
-    padding: 0.15cm;
-    border: 0.5pt solid #000;
-    background-color: #f0f0f0;
-    width: 3cm;
+    background-color: #3d7a54 !important;
+    color: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    border: 0.5pt solid #3d7a54 !important;
+    width: 1cm;
+    padding: 0;
+    font-size: 7pt;
+    vertical-align: middle;
+  }
+
+  .print-category-label span {
+    padding: 0.3cm 0.2cm;
   }
 
   .print-calendar td {
-    border: 0.5pt solid #000;
-    padding: 0;
-    height: 3.2cm;
+    border: 0.5pt solid #b8d4be !important;
+    height: 3cm;
+    background-color: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    vertical-align: middle;
   }
 
   .print-cell-wrapper {
-    padding: 0;
-    height: 3.2cm;
-    vertical-align: middle;
-    overflow: hidden;
+    height: 3cm;
+    background-color: white !important;
   }
 
   .print-cell {
-    padding: 0.25cm 0.3cm;
-    height: 3.2cm;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    word-wrap: break-word;
-    word-break: break-word;
-    overflow: hidden;
-    font-size: 9pt;
+    padding: 0.2cm 0.25cm;
+    height: 3cm;
+    font-size: 8pt;
     line-height: 1.3;
     box-sizing: border-box;
   }
 
   .print-cell-empty {
+    height: 3cm;
+    background-color: white !important;
     padding: 0;
-    height: 3.2cm;
-    background-color: white;
-    border-right: 0.5pt solid #999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
 
   .print-empty-indicator {
-    font-size: 12pt;
+    font-size: 10pt;
     color: #ccc;
-    font-weight: 300;
   }
 
   .print-recipe-name {
     font-family: 'Playfair Display', serif;
-    font-size: 11pt;
-    line-height: 1.3;
+    font-size: 9pt;
     font-weight: bold;
     color: #000;
-    margin-bottom: 0.1cm;
+    margin-bottom: 0.05cm;
   }
 
   .print-veggie-indicator {
-    font-size: 9pt;
-    font-weight: normal;
-    margin-left: 0.1cm;
-    color: #000;
+    font-size: 8pt;
+    color: #3d7a54;
   }
 
   .print-annotation {
-    font-size: 8pt;
-    line-height: 1.2;
+    font-size: 7pt;
     color: #444;
-    font-style: italic;
-    margin-top: 0.1cm;
+    margin-top: 0.05cm;
   }
 
   .print-footer {
     text-align: center;
-    font-size: 8pt;
-    color: #666;
-    margin-top: 0.5cm;
-    padding-top: 0.2cm;
-    border-top: 0.5pt solid #ccc;
-    page-break-before: avoid;
+    font-size: 7pt;
+    color: #777;
+    margin-top: 0.2cm;
+    padding-top: 0.1cm;
+    border-top: 0.5pt solid #c8dece !important;
   }
 
-  /* Hide screen-only elements */
   .print-loading,
   .print-error {
     display: none;
   }
 
-  /* Prevent page breaks inside table */
   .print-calendar tbody {
     page-break-inside: avoid;
   }

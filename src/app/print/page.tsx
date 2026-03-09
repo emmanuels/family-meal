@@ -47,6 +47,7 @@ const MEAL_CATEGORIES = [
   'Dîner',
 ] as const
 
+
 const DAYS_OF_WEEK = [
   'Lundi',
   'Mardi',
@@ -175,7 +176,16 @@ function PrintPageContent() {
   return (
     <div className="print-page">
       <div className="print-header">
-        <h1>{getWeekDateRange(weekParam)}</h1>
+        <div className="print-header-decos print-decos-left">
+          <span>🥕</span><span>🫛</span><span>🥦</span><span>🍎</span>
+        </div>
+        <div className="print-header-center">
+          <h1 className="print-title">Menu de la semaine</h1>
+          <p className="print-subtitle">{getWeekDateRange(weekParam).toLowerCase()}</p>
+        </div>
+        <div className="print-header-decos print-decos-right">
+          <span>🧅</span><span>🥬</span><span>🍐</span><span>🎃</span>
+        </div>
       </div>
 
       <table className="print-calendar">
@@ -192,7 +202,9 @@ function PrintPageContent() {
         <tbody>
           {MEAL_CATEGORIES.map((category) => (
             <tr key={category} className="print-row">
-              <th className="print-category-label">{category}</th>
+              <th className="print-category-label">
+                <span>{category}</span>
+              </th>
               {Array.from({ length: 7 }).map((_, dayIndex) => (
                 <td key={`${category}-${dayIndex}`} className="print-cell-wrapper">
                   {renderMealCell(slotsByDayAndMeal[dayIndex][category])}
