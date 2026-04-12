@@ -1,19 +1,27 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '@/store/store'
 import { DraggableRecipeCard } from './DraggableRecipeCard'
 import { FilterPills, type FilterCategory } from './FilterPills'
 import type { Recipe } from '@/types/index'
 
-function filterRecipes(recipes: Recipe[], filter: FilterCategory): Recipe[] {
-  if (filter === 'Tous') return recipes
-  if (filter === 'Déjeuner') {
-    return recipes.filter(
-      (r) => r.category === 'Déjeuner Midi' || r.category === 'Déjeuner Pique-nique',
-    )
+function filterRecipes(recipes: Recipe[], filter: FilterCategory, query: string): Recipe[] {
+  let result = recipes
+  if (filter !== 'Tous') {
+    if (filter === 'Déjeuner') {
+      result = result.filter(
+        (r) => r.category === 'Déjeuner Midi' || r.category === 'Déjeuner Pique-nique',
+      )
+    } else {
+      result = result.filter((r) => r.category === filter)
+    }
   }
-  return recipes.filter((r) => r.category === filter)
+  if (query.trim()) {
+    const q = query.trim().toLowerCase()
+    result = result.filter((r) => r.name.toLowerCase().includes(q))
+  }
+  return result
 }
 
 export function RecipeLibrary() {
@@ -22,19 +30,22 @@ export function RecipeLibrary() {
   const isLoadingPlan = useAppStore((s) => s.isLoadingPlan)
   const toggleQuickAdd = useAppStore((s) => s.toggleQuickAdd)
 
-  // Show skeleton whenever the initial data fetch is in progress.
-  // isLoadingPlan starts as true (store default), so the skeleton appears immediately
-  // and avoids a flash of "Aucune recette trouvée" before the useEffect fires.
   const isLoading = isLoadingPlan || isLoadingRecipes
 
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('Tous')
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
 
-  // Reset filter on week navigation (when isLoading transitions to true)
+  // Reset filter and search on week navigation
   useEffect(() => {
-    if (isLoading) setActiveFilter('Tous')
+    if (isLoading) {
+      setActiveFilter('Tous')
+      setSearchQuery('')
+    }
   }, [isLoading])
 
-  const filteredRecipes = filterRecipes(recipes, activeFilter)
+  const filteredRecipes = filterRecipes(recipes, activeFilter, searchQuery)
+  const hasActiveFilters = activeFilter !== 'Tous' || searchQuery.trim() !== ''
 
   return (
     <div className="flex h-full flex-col">
@@ -62,23 +73,42 @@ export function RecipeLibrary() {
         </div>
       ) : (
         <>
-          {/* Filter pills — rendered in loaded state only (not during skeleton) */}
+          {/* Search input */}
+          <div className="px-4 py-2">
+            <input
+              ref={searchRef}
+              type="search"
+              placeholder="Rechercher une recette…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded border border-warm/60 bg-cream px-2.5 py-1 text-xs text-charcoal placeholder:text-charcoal/40 focus:outline-none focus:ring-1 focus:ring-terracotta"
+              aria-label="Rechercher une recette"
+            />
+          </div>
+
+          {/* Filter pills */}
           <FilterPills value={activeFilter} onChange={setActiveFilter} />
           <div className="border-b border-warm/40" />
 
-          {/* Recipe list — three branches: data-empty / filter-empty / populated */}
+          {/* Recipe list */}
           {recipes.length === 0 ? (
             <p className="px-4 py-3 text-xs text-charcoal/40">Aucune recette trouvée</p>
           ) : filteredRecipes.length === 0 ? (
             <div className="px-4 py-3">
-              <p className="text-xs text-charcoal/40">Aucune recette dans cette catégorie.</p>
-              <button
-                type="button"
-                onClick={() => setActiveFilter('Tous')}
-                className="mt-1 text-xs text-terracotta hover:underline"
-              >
-                Voir toutes les recettes
-              </button>
+              <p className="text-xs text-charcoal/40">
+                {searchQuery.trim()
+                  ? 'Aucune recette correspondante.'
+                  : 'Aucune recette dans cette catégorie.'}
+              </p>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={() => { setActiveFilter('Tous'); setSearchQuery('') }}
+                  className="mt-1 text-xs text-terracotta hover:underline"
+                >
+                  Réinitialiser les filtres
+                </button>
+              )}
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">

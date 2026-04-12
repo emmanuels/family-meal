@@ -491,7 +491,13 @@ export async function duplicateWeekPlan(fromWeek: string, toWeek: string, family
     fromSlotMap.set(`${slot.day}-${slot.slotType}`, slot)
   }
 
-  // Build patch records for all current week slots
+  // Build lookup of existing target week slots to distinguish PATCH vs CREATE
+  const toSlotMap = new Map<string, MealSlot>()
+  for (const slot of toPlan.slots) {
+    toSlotMap.set(`${slot.day}-${slot.slotType}`, slot)
+  }
+
+  // PATCH existing target slots (copy recipe from source, or clear if source has none)
   const patchRecords = toPlan.slots.map((toSlot) => {
     const key = `${toSlot.day}-${toSlot.slotType}`
     const fromSlot = fromSlotMap.get(key)
@@ -505,10 +511,38 @@ export async function duplicateWeekPlan(fromWeek: string, toWeek: string, family
     }
   })
 
-  await airtableBatchPatch('Planning', patchRecords)
+  if (patchRecords.length > 0) {
+    await airtableBatchPatch('Planning', patchRecords)
+  }
+
+  // CREATE new slots for source slots that have a recipe but no matching target slot.
+  // This handles weeks that are fully or partially empty (no prior Airtable records).
+  const weekStartDate = new Date(toPlan.weekStart + 'T00:00:00Z')
+  const createdSlots: MealSlot[] = []
+
+  for (const fromSlot of fromPlan.slots) {
+    if (!fromSlot.recipeId) continue // skip empty source slots
+    const key = `${fromSlot.day}-${fromSlot.slotType}`
+    if (toSlotMap.has(key)) continue // already handled by PATCH above
+
+    const slotDate = new Date(weekStartDate)
+    slotDate.setUTCDate(weekStartDate.getUTCDate() + fromSlot.day)
+    const dateStr = slotDate.toISOString().slice(0, 10)
+
+    const newId = await createPlanningSlot(dateStr, fromSlot.day, fromSlot.slotType, fromSlot.recipeId, familyCode)
+    createdSlots.push({
+      id: newId,
+      date: dateStr,
+      day: fromSlot.day,
+      slotType: fromSlot.slotType,
+      recipeId: fromSlot.recipeId,
+      recipeName: fromSlot.recipeName,
+      notes: null,
+    })
+  }
 
   // Reconstruct updated WeekPlan in memory — avoids an extra Airtable fetch
-  const updatedSlots = toPlan.slots.map((toSlot) => {
+  const updatedExistingSlots = toPlan.slots.map((toSlot) => {
     const key = `${toSlot.day}-${toSlot.slotType}`
     const fromSlot = fromSlotMap.get(key)
     return {
@@ -519,5 +553,13 @@ export async function duplicateWeekPlan(fromWeek: string, toWeek: string, family
     }
   })
 
-  return WeekPlanSchema.parse({ ...toPlan, slots: updatedSlots })
+  const allSlots = [...updatedExistingSlots, ...createdSlots].sort((a, b) => {
+    if (a.day !== b.day) return a.day - b.day
+    return (
+      (SLOT_TYPE_ORDER as readonly string[]).indexOf(a.slotType) -
+      (SLOT_TYPE_ORDER as readonly string[]).indexOf(b.slotType)
+    )
+  })
+
+  return WeekPlanSchema.parse({ ...toPlan, slots: allSlots })
 }
