@@ -1,20 +1,12 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useAppStore } from '@/store/store'
-import { RAYONS, rayonSortKey } from '@/lib/utils'
+import { RAYONS, normalizeUnit, rayonSortKey } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { ShoppingItem } from '@/types/index'
 
 /**
- * useCopyShoppingList hook — fetches shopping list from API and copies to clipboard
- * 
- * Handles:
- * - Fetching `/api/shopping-list?week={{currentWeek}}` endpoint
- * - Formatting response into plain text with rayon headers
- * - Copying to clipboard via Web Clipboard API
- * - Fallback handling if clipboard unavailable
- * - Loading and error states
- * 
- * @returns Object with copy function, loading state, error state, and clipboard availability
+ * useCopyShoppingList hook — builds shopping list from store and copies to clipboard.
+ * Uses client-side aggregation (same source as ShoppingPanel) — no API call needed.
  */
 export function useCopyShoppingList() {
   const [isLoading, setIsLoading] = useState(false)
@@ -24,129 +16,103 @@ export function useCopyShoppingList() {
   )
   const [formattedContent, setFormattedContent] = useState('')
 
-  const currentWeek = useAppStore((state) => state.currentWeek)
+  const weekPlan = useAppStore((state) => state.weekPlan)
+  const recipes = useAppStore((state) => state.recipes)
+  const ingredientMap = useAppStore((state) => state.ingredientMap)
 
-  /**
-   * Format shopping items into plain text with rayon headers
-   * 
-   * Example output:
-   * ```
-   * Fruits & Légumes
-   * 200 g — Tomate cerise
-   * 500 g — Carotte
-   * 
-   * Produits frais
-   * 1 L — Lait
-   * ```
-   */
-  const formatShoppingList = (items: ShoppingItem[]): string => {
-    if (items.length === 0) {
-      return 'Aucun repas planifié pour cette semaine'
+  // Derive shopping list from store (same logic as useShoppingList)
+  const items = useMemo((): ShoppingItem[] => {
+    if (!weekPlan) return []
+    const recipeMap = new Map(recipes.map((r) => [r.id, r]))
+    const accumulator = new Map<string, { quantity: number; unit: string; rayon: string; name: string }>()
+
+    for (const slot of weekPlan.slots) {
+      if (!slot.recipeId) continue
+      const recipe = recipeMap.get(slot.recipeId)
+      if (!recipe) continue
+      for (const ingredientId of recipe.ingredientIds) {
+        const ingredient = ingredientMap[ingredientId]
+        if (!ingredient) continue
+        const normUnit = normalizeUnit(ingredient.unit)
+        const key = `${ingredient.name.toLowerCase()}|${normUnit}`
+        const existing = accumulator.get(key)
+        if (existing) {
+          existing.quantity += ingredient.quantity
+        } else {
+          accumulator.set(key, { name: ingredient.name, quantity: ingredient.quantity, unit: normUnit, rayon: ingredient.rayon })
+        }
+      }
     }
 
-    // Group by rayon
+    return Array.from(accumulator.values()).sort((a, b) => {
+      const cmp = rayonSortKey(a.rayon) - rayonSortKey(b.rayon)
+      return cmp !== 0 ? cmp : a.name.localeCompare(b.name)
+    })
+  }, [weekPlan, recipes, ingredientMap])
+
+  const formatShoppingList = useCallback((shoppingItems: ShoppingItem[]): string => {
+    if (shoppingItems.length === 0) return 'Aucun repas planifié pour cette semaine'
+
     const byRayon = new Map<string, ShoppingItem[]>()
-    for (const item of items) {
+    for (const item of shoppingItems) {
       const key = item.rayon || 'Autre'
-      if (!byRayon.has(key)) {
-        byRayon.set(key, [])
-      }
+      if (!byRayon.has(key)) byRayon.set(key, [])
       byRayon.get(key)!.push(item)
     }
 
-    // Build formatted text with rayon headers
     const lines: string[] = []
-    const rayonOrder = RAYONS
-
-    for (const rayon of rayonOrder) {
-      const items = byRayon.get(rayon)
-      if (!items || items.length === 0) continue
-
+    for (const rayon of RAYONS) {
+      const group = byRayon.get(rayon)
+      if (!group || group.length === 0) continue
       lines.push(rayon)
-      for (const item of items) {
-        lines.push(`${item.quantity} ${item.unit} — ${item.name}`)
-      }
-      lines.push('') // Empty line between rayons
+      for (const item of group) lines.push(`${item.quantity} ${item.unit} — ${item.name}`)
+      lines.push('')
     }
 
-    // Handle unknown rayons (not in RAYONS constant)
     const unknownItems = byRayon.get('Autre')
     if (unknownItems && unknownItems.length > 0) {
       lines.push('Autre')
-      for (const item of unknownItems) {
-        lines.push(`${item.quantity} ${item.unit} — ${item.name}`)
-      }
+      for (const item of unknownItems) lines.push(`${item.quantity} ${item.unit} — ${item.name}`)
     }
 
-    // Remove trailing empty line
     return lines.join('\n').trim()
-  }
+  }, [])
 
-  /**
-   * Main copy function — fetches shopping list and copies to clipboard
-   */
   const copy = useCallback(async (): Promise<void> => {
     setIsLoading(true)
     setError(null)
 
     try {
-      // Fetch shopping list from Story 4.1 endpoint
-      const response = await fetch(`/api/shopping-list?week=${currentWeek}`)
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      const items = (await response.json()) as ShoppingItem[]
-
-      // Check for empty shopping list
       if (items.length === 0) {
         toast.warning('Aucun repas planifié pour cette semaine')
-        setIsLoading(false)
-        return // Don't copy empty list
+        return
       }
 
-      // Format for clipboard
       const formatted = formatShoppingList(items)
       setFormattedContent(formatted)
 
-      // Try clipboard API first
       if (clipboardAvailable) {
         try {
           await navigator.clipboard.writeText(formatted)
-          toast.success('Liste copiée — prête pour Carrefour Drive')
+          toast.success('Liste copiée ✓')
         } catch (clipboardError) {
-          // Clipboard API failed (e.g., permission denied)
           console.warn('Clipboard API failed:', clipboardError)
           setClipboardAvailable(false)
-          // Will show fallback modal on next render
           throw new Error('Clipboard API unavailable — showing fallback')
         }
       } else {
-        // Clipboard API not available
         throw new Error('Clipboard API unavailable')
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error'
-      console.error('Failed to copy shopping list:', errorMsg)
-      
-      // Differentiate error types for better UX
-      if (errorMsg.includes('Clipboard')) {
-        // No toast for clipboard unavailable (fallback modal will show)
-        console.warn('Clipboard unavailable, will show fallback modal')
-      } else if (errorMsg.includes('HTTP')) {
-        toast.error('Impossible de charger la liste: serveur indisponible')
-      } else if (errorMsg.includes('Aucun repas')) {
-        // Already handled above
-      } else {
-        toast.error('Erreur: Impossible de copier la liste')
+      if (!errorMsg.includes('Clipboard')) {
+        toast.error('Impossible de copier la liste')
       }
-      
       setError(err instanceof Error ? err : new Error(String(err)))
     } finally {
       setIsLoading(false)
     }
-  }, [currentWeek, clipboardAvailable])
+  }, [items, clipboardAvailable, formatShoppingList])
 
   return {
     copy,
